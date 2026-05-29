@@ -1,0 +1,22 @@
+[project]
+name = "mdr-processing-pipe"
+version = "0.1.0"
+description = "EEG processing pipeline with MNE for MDR psychology research"
+authors = [
+    {name = "Vinicius Duarte",email = "viniciusduarte06@gmail.com"}
+]
+requires-python = "^3.11"
+dependencies = [
+    "mne (>=1.12.1,<2.0.0)",
+    "pandas (>=3.0.3,<4.0.0)",
+    "pyyaml (>=6.0.3,<7.0.0)",
+    "scikit-learn (>=1.8.0,<2.0.0)"
+]
+
+
+[tool.poetry]
+packages = [{include = "mdr_processing_pipe", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
