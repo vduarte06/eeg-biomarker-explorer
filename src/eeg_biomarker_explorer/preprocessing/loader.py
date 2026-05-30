@@ -47,7 +47,7 @@ def _rename_to_1020(raw: mne.io.Raw) -> None:
     raw.rename_channels(rename_map)
 
 
-def load_raw(path: str | Path) -> mne.io.Raw:
+def load_raw(path: str | Path, exclude: list[str] | None = None) -> mne.io.Raw:
     """Load a real EEG file. Supports .fif, .edf, .bdf, .set, .vhdr."""
     path = Path(path)
     readers = {
@@ -62,6 +62,6 @@ def load_raw(path: str | Path) -> mne.io.Raw:
         raise ValueError(
             f"Unsupported format '{path.suffix}'. Supported: {list(readers)}"
         )
-    raw = reader(path, preload=True)
+    raw = reader(path, preload=True, exclude=exclude or [])
     raw.pick(["eeg", "eog"])
     return raw

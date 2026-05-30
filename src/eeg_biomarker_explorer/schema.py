@@ -11,13 +11,15 @@ from pydantic import BaseModel, field_validator, model_validator
 
 class DatasetConfig(BaseModel):
     path: str
+    exclude: list[str] = []
 
 
 class InputConfig(BaseModel):
     dataset: DatasetConfig
-    # events may contain a reserved 'path' key (session log file) alongside
-    # the friendly_name → annotation_label mappings.
+    # events / user_events may contain a reserved 'path' key (session log file)
+    # alongside friendly_name → annotation_label mappings.
     events: dict[str, str] = {}
+    user_events: dict[str, str] = {}
     regions: dict[str, list[str]] = {}
 
 

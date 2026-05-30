@@ -33,14 +33,16 @@ def detect_bad_channels(raw: mne.io.Raw, z_threshold: float = 3.0) -> mne.io.Raw
     Channels whose std z-score exceeds z_threshold, or whose std is below 1 nV
     (flat), are added to raw.info['bads'].
     """
-    data = raw.get_data()
+    picks = mne.pick_types(raw.info, eeg=True, exclude=[])
+    data = raw.get_data(picks=picks)
+    ch_names = [raw.ch_names[i] for i in picks]
     stds = data.std(axis=1)
 
     flat_mask = stds < 1e-9
     z_scores = (stds - stds.mean()) / (stds.std() + 1e-30)
     noisy_mask = np.abs(z_scores) > z_threshold
 
-    new_bads = [ch for ch, bad in zip(raw.ch_names, flat_mask | noisy_mask) if bad]
+    new_bads = [ch for ch, bad in zip(ch_names, flat_mask | noisy_mask) if bad]
     raw.info["bads"] = list(set(raw.info["bads"]) | set(new_bads))
 
     if new_bads:
@@ -55,6 +57,12 @@ def detect_bad_channels(raw: mne.io.Raw, z_threshold: float = 3.0) -> mne.io.Raw
 
 def rereference(raw: mne.io.Raw, ref: str = "average") -> mne.io.Raw:
     """Apply EEG re-referencing (average, REST, or a named channel)."""
+    if ref == "average":
+        good_picks = mne.pick_types(raw.info, eeg=True, exclude="bads")
+        good_chs = [raw.ch_names[i] for i in good_picks]
+        print(f"  [rereference] {len(good_chs)} channels in average: {good_chs}")
+        if raw.info["bads"]:
+            print(f"  [rereference] excluded (bads): {raw.info['bads']}")
     raw.set_eeg_reference(ref, projection=False, verbose=False)
     return raw
 
@@ -181,14 +189,19 @@ def epoch_by_annotations(
     raw: mne.io.Raw,
     tmin: float = -0.2,
     tmax: float = 0.8,
-) -> mne.Epochs:
+) -> tuple[mne.Epochs | None, np.ndarray, dict]:
     """Create fixed-length epochs time-locked to session annotation onsets.
 
     Each START_* annotation (EMDR_T, EMDR_O, INTROCEPTION) becomes an epoch.
     Bad segments are automatically rejected via the 'BAD_' annotation prefix.
+
+    Returns
+    -------
+    epochs   : mne.Epochs or None
+    events   : np.ndarray, shape (n_events, 3)
+    phase_id : dict mapping phase label → event code
     """
     events, event_id = mne.events_from_annotations(raw, verbose=False)
-    # Keep only session-phase events
     phase_id = {
         k: v
         for k, v in event_id.items()
@@ -197,7 +210,7 @@ def epoch_by_annotations(
 
     if not phase_id:
         print("  [epoching] no phase annotations found — returning None")
-        return None
+        return None, events, phase_id
 
     epochs = mne.Epochs(
         raw,
@@ -211,7 +224,50 @@ def epoch_by_annotations(
         verbose=False,
     )
     print(f"  [epoching] {len(epochs)} epochs across {list(phase_id.keys())}")
-    return epochs
+    return epochs, events, phase_id
+
+
+def crop_raw_to_epochs(
+    raw: mne.io.Raw,
+    events: np.ndarray,
+    phase_id: dict,
+    tmin: float = -0.2,
+    tmax: float = 0.8,
+) -> mne.io.Raw:
+    """Crop raw to the union of epoch windows and concatenate into a single Raw.
+
+    Parameters
+    ----------
+    raw      : cleaned mne.io.Raw (not modified)
+    events   : events array returned by epoch_by_annotations
+    phase_id : phase-label → event-code mapping returned by epoch_by_annotations
+    tmin, tmax : epoch window relative to each event onset (seconds)
+
+    Returns
+    -------
+    mne.io.Raw — concatenation of all cropped segments
+    """
+    phase_codes = set(phase_id.values())
+    sfreq = raw.info["sfreq"]
+    segments = []
+
+    for sample, _, code in events:
+        if code not in phase_codes:
+            continue
+        onset = sample / sfreq
+        t_start = max(raw.times[0] + raw.first_samp / sfreq, onset + tmin)
+        t_end = min(raw.times[-1] + raw.first_samp / sfreq, onset + tmax)
+        segments.append(raw.copy().crop(tmin=t_start, tmax=t_end))
+
+    if not segments:
+        print("  [crop] no matching events found — returning original raw")
+        return raw
+
+    cropped = mne.concatenate_raws(segments)
+    print(
+        f"  [crop] concatenated {len(segments)} segments → {cropped.times[-1]:.1f}s total"
+    )
+    return cropped
 
 
 # ── Full pipeline ─────────────────────────────────────────────────────────────
@@ -271,7 +327,9 @@ def preprocess(
     if do_epoch:
         print("7. Epoching")
         ep_cfg = cfg.get("epoching", {"tmin": -0.2, "tmax": 0.8})
-        epochs = epoch_by_annotations(raw, tmin=ep_cfg["tmin"], tmax=ep_cfg["tmax"])
+        epochs, _, _ = epoch_by_annotations(
+            raw, tmin=ep_cfg["tmin"], tmax=ep_cfg["tmax"]
+        )
     else:
         print("7. Epoching — skipped (handled by runner after annotation)")
 

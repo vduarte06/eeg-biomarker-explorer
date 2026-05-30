@@ -29,6 +29,8 @@ from eeg_biomarker_explorer.preprocessing.pipeline import (
     run_ica,
     interpolate_bad_channels,
     remove_bad_segments,
+    epoch_by_annotations,
+    crop_raw_to_epochs,
 )
 from eeg_biomarker_explorer.analysis.bandpower import (
     run_band_analysis,
@@ -54,6 +56,7 @@ _PREPROCESSING_STEPS = {
     "ica",
     "interpolate",
     "bad_segment_annotation",
+    "annotate",
     "plot",
 }
 _FEATURE_STEPS = {"spectral_power", "peak_power", "faa", "plot"}
@@ -68,15 +71,19 @@ _DEFAULTS = {
         "method": "fastica",
         "eog_channels": None,
         "eog_threshold": 3.0,
+        "l_freq": 1.0,
+        "h_freq": None,
     },
     "interpolate": {},
     "bad_segment_annotation": {"peak_amplitude": 150e-6},
+    "annotate": {"output": "./data/raw/user_epochs.json", "sensitivity": 50.0},
     "plot": {
         "duration": 20,
         "n_channels": 20,
         "scalings": "auto",
         "title": None,
         "sensitivity": None,
+        "time_format": "clock",
     },
     "spectral_power": {
         "events": [],
@@ -111,6 +118,16 @@ class PipelineRunner:
             self._ensure_sample_events(log_path, event_map)
 
         self._apply_session_log(raw, log_path)
+
+        raw_user_events = inp.get("user_events", {})
+        user_log_path = raw_user_events.get("path") if raw_user_events else None
+        user_event_map = {
+            k: v for k, v in (raw_user_events or {}).items() if k != "path"
+        }
+        if user_log_path:
+            self._apply_user_events(raw, user_log_path)
+            event_map.update(user_event_map)
+
         regions = {
             name: (cfg["channels"] if isinstance(cfg, dict) else cfg)
             for name, cfg in inp.get("regions", {}).items()
@@ -128,13 +145,16 @@ class PipelineRunner:
 
     def _load_data(self, dataset: dict) -> mne.io.Raw:
         path = dataset["path"]
+        exclude = dataset.get("exclude", [])
         print(f"\n── Input ──────────────────────────────────────────────────────")
         if path == "sample":
             print("  dataset  : MNE sample")
             return load_sample()
         full = self.root / path
         print(f"  dataset  : {full}")
-        return load_raw(full)
+        if exclude:
+            print(f"  exclude  : {exclude}")
+        return load_raw(full, exclude=exclude)
 
     def _ensure_sample_events(self, log_path: str, event_map: dict) -> None:
         path = self.root / log_path
@@ -176,6 +196,19 @@ class PipelineRunner:
             )
         )
         print(f"  log      : {len(visible)} annotation(s) applied")
+
+    def _apply_user_events(self, raw: mne.io.Raw, log_path: str) -> None:
+        log = load_log(self.root / log_path)
+        segments = extract_segments(log)
+        rec_dur = raw.times[-1]
+        visible = [(s, e, k) for s, e, k in segments if s < rec_dur]
+        new_annots = mne.Annotations(
+            onset=[s for s, e, k in visible],
+            duration=[e - s for s, e, k in visible],
+            description=[k for s, e, k in visible],
+        )
+        raw.set_annotations(raw.annotations + new_annots)
+        print(f"  user_events: {len(visible)} annotation(s) merged from {log_path}")
 
     # ── preprocessing ─────────────────────────────────────────────────────────
 
@@ -234,6 +267,12 @@ class PipelineRunner:
             print(f"{label}  (peak > {cfg['peak_amplitude']*1e6:.0f} µV)")
             return remove_bad_segments(raw, peak_amplitude=cfg["peak_amplitude"])
 
+        elif kind == "annotate":
+            output = cfg.get("output", "./data/raw/user_epochs.json")
+            sensitivity = cfg.get("sensitivity", 50.0)
+            print(f"{label}  → '{output}'")
+            return self._annotate_step(raw, output, sensitivity)
+
         elif kind == "plot":
             title = cfg.get("title") or f"Preprocessing step {idx}"
             print(f"{label}  → '{title}' (close window to continue)")
@@ -241,6 +280,21 @@ class PipelineRunner:
             return raw
 
         print(f"{label}  [unknown — skipped]")
+        return raw
+
+    def _annotate_step(
+        self, raw: mne.io.Raw, output: str, sensitivity: float
+    ) -> mne.io.Raw:
+        from eeg_biomarker_explorer.preprocessing.annotator import (
+            annotate_interactive,
+            annotations_to_events_json,
+            save_user_events,
+        )
+
+        new_anns = annotate_interactive(raw, sensitivity=sensitivity)
+        if new_anns:
+            events_json = annotations_to_events_json(new_anns)
+            save_user_events(events_json, self.root / output)
         return raw
 
     # ── feature extraction ────────────────────────────────────────────────────
@@ -332,11 +386,15 @@ class PipelineRunner:
             if sensitivity is not None
             else cfg.get("scalings", "auto")
         )
+        time_format = cfg.get(
+            "time_format", "clock" if raw.info.get("meas_date") else "float"
+        )
         raw.plot(
             duration=cfg.get("duration", 20),
             n_channels=cfg.get("n_channels", 20),
             scalings=scalings,
             title=title,
+            time_format=time_format,
             block=False,
         )
         plt.show(block=True)
@@ -501,6 +559,57 @@ def crop_edf(input_path: str, start: str, end: str, output: str) -> None:
     print("  done.")
 
 
+def annotate_command(
+    edf_path: str,
+    events_path: str | None,
+    output: str | None,
+    sensitivity: float,
+) -> None:
+    """Open an interactive plot on an EDF file and save user-drawn annotations as JSON.
+
+    The output file uses the same START_/END_ format as events.json, with
+    00:00:00.000 representing the recording start.
+    """
+    from eeg_biomarker_explorer.preprocessing.annotator import (
+        annotate_interactive,
+        annotations_to_events_json,
+        save_user_events,
+    )
+
+    inp = Path(edf_path)
+    out = Path(output) if output else inp.with_name(inp.stem + "_user_epochs.json")
+
+    print(f"\n── Annotate ────────────────────────────────────────────────────")
+    print(f"  input    : {inp}")
+
+    raw = load_raw(inp)
+
+    if events_path:
+        log = load_log(Path(events_path))
+        segments = extract_segments(log)
+        rec_dur = raw.times[-1]
+        visible = [(s, e, k) for s, e, k in segments if s < rec_dur]
+        raw.set_annotations(
+            mne.Annotations(
+                onset=[s for s, e, k in visible],
+                duration=[e - s for s, e, k in visible],
+                description=[k for s, e, k in visible],
+            )
+        )
+        print(f"  events   : {len(visible)} reference annotation(s) from {events_path}")
+
+    new_anns = annotate_interactive(raw, sensitivity=sensitivity)
+
+    if not new_anns:
+        print("  no new annotations created — nothing saved.")
+        return
+
+    events_json = annotations_to_events_json(new_anns)
+    save_user_events(events_json, out)
+    print(f"  output   : {out}")
+    print("  done.")
+
+
 def new_pipeline(path: str) -> None:
     dest = Path(path)
     if dest.exists():
@@ -510,6 +619,66 @@ def new_pipeline(path: str) -> None:
     dest.write_text(_TEMPLATE)
     print(f"Created {dest}")
     print("Edit the file, then run:  eeg-pipe run", dest)
+
+
+def epochs_command(
+    edf_path: str,
+    events_path: str | None,
+    output: str | None,
+    tmin: float,
+    tmax: float,
+) -> None:
+    """Extract epoch windows from an EDF and save a cropped EDF."""
+    inp = Path(edf_path)
+    out = Path(output) if output else inp.with_stem(inp.stem + "_epochs")
+
+    print(f"\n── Epochs ─────────────────────────────────────────────────────")
+    print(f"  input    : {inp}")
+
+    raw = load_raw(inp)
+
+    if events_path:
+        log = load_log(Path(events_path))
+        segments = extract_segments(log)
+        rec_dur = raw.times[-1]
+        visible = [(s, e, k) for s, e, k in segments if s < rec_dur]
+        raw.set_annotations(
+            mne.Annotations(
+                onset=[s for s, e, k in visible],
+                duration=[e - s for s, e, k in visible],
+                description=[k for s, e, k in visible],
+            )
+        )
+        print(f"  events   : {len(visible)} annotation(s) applied from {events_path}")
+
+    epochs, events, phase_id = epoch_by_annotations(raw, tmin=tmin, tmax=tmax)
+
+    if epochs is None:
+        print("  no epochs found — nothing to save.")
+        sys.exit(1)
+
+    cropped = crop_raw_to_epochs(raw, events, phase_id, tmin=tmin, tmax=tmax)
+
+    # EDF physical range constraint: drop channels whose values exceed what
+    # the 8-char ASCII field can encode (±9 999 999 µV).
+    data = cropped.get_data()
+    max_v = 9.999999
+    encodable = [
+        ch
+        for i, ch in enumerate(cropped.ch_names)
+        if abs(data[i].min()) <= max_v and abs(data[i].max()) <= max_v
+    ]
+    dropped = [ch for ch in cropped.ch_names if ch not in encodable]
+    if dropped:
+        print(f"  dropped  : {dropped}  (physical range too large for EDF format)")
+        cropped.pick(encodable)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cropped.export(
+        str(out), fmt="edf", physical_range="channelwise", overwrite=True, verbose=False
+    )
+    print(f"  output   : {out}")
+    print("  done.")
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -528,6 +697,31 @@ def cli() -> None:
         "path", help="Destination path (e.g. pipelines/my_study.yaml)"
     )
 
+    ann_p = sub.add_parser(
+        "annotate", help="Interactively annotate epochs on an EDF and save to JSON"
+    )
+    ann_p.add_argument("edf", help="Path to EDF file")
+    ann_p.add_argument(
+        "--events",
+        "-e",
+        metavar="FILE",
+        help="Path to events.json to display as reference annotations (optional)",
+    )
+    ann_p.add_argument(
+        "--output",
+        "-o",
+        metavar="FILE",
+        help="Output JSON path (default: <edf-stem>_user_epochs.json)",
+    )
+    ann_p.add_argument(
+        "--sensitivity",
+        "-s",
+        type=float,
+        default=50.0,
+        metavar="UV",
+        help="Plot sensitivity in µV/div (default: 50)",
+    )
+
     crop_p = sub.add_parser("crop", help="Crop an EDF file to a clock-time window")
     crop_p.add_argument("input", help="Path to source EDF file")
     crop_p.add_argument(
@@ -538,13 +732,57 @@ def cli() -> None:
         "--output", "-o", required=True, metavar="FILE", help="Output EDF path"
     )
 
+    ep_p = sub.add_parser("epochs", help="Crop an EDF to its annotated epoch windows")
+    ep_p.add_argument("edf", help="Path to source EDF file")
+    ep_p.add_argument(
+        "--events",
+        "-e",
+        metavar="FILE",
+        help="Path to events.json session log (optional if EDF already has annotations)",
+    )
+    ep_p.add_argument(
+        "--output",
+        "-o",
+        metavar="FILE",
+        help="Output EDF path (default: <input>_epochs.edf)",
+    )
+    ep_p.add_argument(
+        "--tmin",
+        type=float,
+        default=-0.2,
+        metavar="SEC",
+        help="Epoch start relative to onset in seconds (default: -0.2)",
+    )
+    ep_p.add_argument(
+        "--tmax",
+        type=float,
+        default=0.8,
+        metavar="SEC",
+        help="Epoch end relative to onset in seconds (default: 0.8)",
+    )
+
     args = parser.parse_args()
     if args.cmd == "run":
         PipelineRunner(args.pipeline).run()
+    elif args.cmd == "annotate":
+        annotate_command(
+            args.edf,
+            events_path=args.events,
+            output=args.output,
+            sensitivity=args.sensitivity,
+        )
     elif args.cmd == "new":
         new_pipeline(args.path)
     elif args.cmd == "crop":
         crop_edf(args.input, args.start, args.end, args.output)
+    elif args.cmd == "epochs":
+        epochs_command(
+            args.edf,
+            events_path=args.events,
+            output=args.output,
+            tmin=args.tmin,
+            tmax=args.tmax,
+        )
     else:
         parser.print_help()
         sys.exit(1)
