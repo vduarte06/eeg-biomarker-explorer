@@ -2,6 +2,29 @@
 
 A declarative EEG analysis framework built on [MNE-Python](https://mne.tools/). Define reproducible preprocessing and feature-extraction workflows using YAML — no code changes needed between studies.
 
+
+## Requirements
+
+- **Python** ≥ 3.11
+- **[Poetry](https://python-poetry.org/)** — install
+
+Runtime libraries (installed with `poetry install`): MNE ≥ 1.12, pandas, PyYAML, scikit-learn, pyarrow, pydantic.
+
+## Installation
+
+```bash
+git clone https://github.com/viniciusduarte06/eeg-biomarker-explorer.git
+cd eeg-biomarker-explorer
+poetry install
+```
+
+## Development
+
+```bash
+poetry shell
+pre-commit install   # black + lint hooks on every commit
+```
+
 ## Quick start
 
 ```bash
@@ -11,6 +34,21 @@ eeg-pipe new pipelines/my_study.yaml
 # edit it, then run
 eeg-pipe run pipelines/my_study.yaml
 ```
+
+## Utilities
+
+### Crop an EDF file
+
+Cut an EDF to a wall-clock time window (UTC) and save a new file:
+
+```bash
+eeg-pipe crop data/raw/subject01.edf \
+    --start 09:15 \
+    --end   09:45 \
+    --output data/raw/subject01_cropped.edf
+```
+
+Times must match the UTC clock time embedded in the EDF header (`meas_date`). The command prints how the window maps to seconds from recording start and warns if any channels are dropped due to EDF format amplitude limits.
 
 ## How it works
 
@@ -58,13 +96,7 @@ output:
   path: ./data/processed
 ```
 
-## Installation
 
-```bash
-git clone https://github.com/viniciusduarte06/eeg-biomarker-explorer.git
-cd eeg-biomarker-explorer
-poetry install
-```
 
 ## Supported input formats
 
@@ -103,18 +135,4 @@ data/processed/
   spectral_power.parquet
   faa.csv
   faa.parquet
-```
-
-## Requirements
-
-- **Python** ≥ 3.11
-- **[Poetry](https://python-poetry.org/)** — install 
-
-Runtime libraries (installed with `poetry install`): MNE ≥ 1.12, pandas, PyYAML, scikit-learn, pyarrow, pydantic.
-
-## Development
-
-```bash
-poetry install
-poetry run pre-commit install   # black + lint hooks on every commit
 ```
