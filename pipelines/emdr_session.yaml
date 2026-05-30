@@ -7,8 +7,9 @@ input:
 
   events:
     path:     ./data/raw/events.json  # session log with timestamps → annotations
-    emdr:     EMDR_T
-    baseline: INTROCEPTION
+    emdr_t:   EMDR_T
+    emdr_o:   EMDR_O
+    introception: INTROCEPTION
 
   regions:
     frontal:   [EEG Fp1, EEG Fp2, EEG F3, EEG F4, EEG Fz] # notice that the channel names are EEG prefixed in our EDF file
@@ -28,7 +29,7 @@ pipeline:
 
     - filter:
         l_freq: 0.5
-        h_freq: 35.0
+        h_freq: 50.0
 
     - line_noise:
         freq: 60.0
@@ -57,7 +58,7 @@ pipeline:
   # Metrics computed on the cleaned, annotated signal — steps run in order
   feature_extraction:
     - spectral_power:
-        events: [emdr, baseline]
+        events: [emdr_t, emdr_o, introception]
         method: welch
         bands:
           theta: [4, 8]
@@ -67,7 +68,7 @@ pipeline:
         relative: true
 
     - peak_power:
-        events: [emdr, baseline]
+        events: [emdr_t, emdr_o, introception]
         method: welch
         bands:
           theta: [4, 8]
@@ -75,7 +76,7 @@ pipeline:
         groupby: region
 
     - faa:
-        events: [emdr, baseline]
+        events: [emdr_t, emdr_o, baseline]
         method: welch
         channels:
           left: EEG F3
