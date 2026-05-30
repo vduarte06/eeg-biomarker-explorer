@@ -159,19 +159,33 @@ def epoch_by_annotations(
 
 # ── Full pipeline ─────────────────────────────────────────────────────────────
 
-def preprocess(raw: mne.io.Raw, cfg: dict) -> tuple[mne.io.Raw, mne.Epochs | None]:
-    """Run the full 7-step preprocessing pipeline from a config dict.
+def preprocess(
+    raw: mne.io.Raw,
+    cfg: dict,
+    do_epoch: bool = False,
+) -> tuple[mne.io.Raw, mne.Epochs | None]:
+    """Run the preprocessing pipeline from a config dict.
 
     Parameters
     ----------
     raw : mne.io.Raw  (preloaded, EEG channels already picked)
-    cfg : dict  — the 'preprocessing' section of config.yaml
+    cfg : dict  — the 'pipeline' section of the pipeline YAML.
+        Supports both old key 'reference' and new key 'rereference.method'.
+    do_epoch : bool
+        If False (default), skip step 7. The runner applies annotations and
+        epochs externally after this function returns.
 
     Returns
     -------
     raw    : cleaned mne.io.Raw
-    epochs : mne.Epochs or None (None if no phase annotations present)
+    epochs : mne.Epochs or None
     """
+    # Resolve re-reference key from either schema
+    ref = (
+        cfg.get("rereference", {}).get("method")
+        or cfg.get("reference", "average")
+    )
+
     print("\n── Preprocessing ─────────────────────────────────────────────")
 
     print("1. Line noise removal")
@@ -181,7 +195,7 @@ def preprocess(raw: mne.io.Raw, cfg: dict) -> tuple[mne.io.Raw, mne.Epochs | Non
     raw = detect_bad_channels(raw, z_threshold=cfg["bad_channels"]["z_threshold"])
 
     print("3. Re-referencing")
-    raw = rereference(raw, ref=cfg["reference"])
+    raw = rereference(raw, ref=ref)
 
     print("4. ICA")
     ica_cfg = cfg["ica"]
@@ -198,9 +212,13 @@ def preprocess(raw: mne.io.Raw, cfg: dict) -> tuple[mne.io.Raw, mne.Epochs | Non
     print("6. Bad time segment removal")
     raw = remove_bad_segments(raw, peak_amplitude=cfg["bad_segments"]["peak_amplitude"])
 
-    print("7. Epoching")
-    ep_cfg = cfg["epoching"]
-    epochs = epoch_by_annotations(raw, tmin=ep_cfg["tmin"], tmax=ep_cfg["tmax"])
+    epochs = None
+    if do_epoch:
+        print("7. Epoching")
+        ep_cfg = cfg.get("epoching", {"tmin": -0.2, "tmax": 0.8})
+        epochs = epoch_by_annotations(raw, tmin=ep_cfg["tmin"], tmax=ep_cfg["tmax"])
+    else:
+        print("7. Epoching — skipped (handled by runner after annotation)")
 
     print("── Preprocessing complete ─────────────────────────────────────\n")
     return raw, epochs

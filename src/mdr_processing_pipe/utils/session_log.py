@@ -58,3 +58,31 @@ def session_duration(log: SessionLog) -> float:
     t0 = next(parse_time(t) for t, l in log if l == "START_SESSION")
     t_end = next(parse_time(t) for t, l in log if l == "FIM_SESSAO")
     return (t_end - t0).total_seconds()
+
+
+def get_segments_from_raw(
+    raw,
+    event_map: dict[str, dict],
+) -> list[tuple[float, float, str]]:
+    """Extract segments from raw annotations using a pipeline event map.
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        Recording with annotations already applied.
+    event_map : dict
+        Maps analysis event names to annotation labels, e.g.
+        {'emdr': {'annotation': 'EMDR_T'}, 'baseline': {'annotation': 'INTROCEPTION'}}
+
+    Returns
+    -------
+    List of (onset_sec, offset_sec, annotation_label) sorted by onset.
+    """
+    label_set = {v["annotation"] for v in event_map.values()}
+    segments = []
+    for ann in raw.annotations:
+        if ann["description"] in label_set:
+            onset  = float(ann["onset"])
+            offset = onset + float(ann["duration"])
+            segments.append((onset, offset, ann["description"]))
+    return sorted(segments)

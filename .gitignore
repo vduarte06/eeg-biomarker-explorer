@@ -7,7 +7,6 @@ dist/
 
 data/raw/
 data/processed/
-data/results/
 
 .DS_Store
 *.fif
@@ -20,3 +19,4 @@ data/results/
 *.cnt
 
 .ipynb_checkpoints/
+__pycache__/*

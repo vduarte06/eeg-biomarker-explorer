@@ -1,0 +1,87 @@
+version: 1
+
+input:
+
+  dataset:
+    path: sample                     # "sample" | path to .edf / .fif / .bdf / .set / .vhdr
+    session_log: ./data/raw/events.json
+
+  events:
+    emdr:
+      annotation: EMDR_T
+    baseline:
+      annotation: INTROCEPTION
+
+  regions:
+    frontal:   [Fp1, Fp2, F3, F4, Fz, F7, F8]
+    central:   [C3, Cz, C4]
+    temporal:  [T7, T8]
+    parietal:  [P3, P4, Pz, P7, P8]
+    occipital: [O1, O2]
+
+
+pipeline:
+
+  # Signal cleaning — steps run in order
+  preprocessing:
+    - plot:
+        title: Raw signal
+        sensitivity: 50              # µV/div
+
+    - filter:
+        l_freq: 0.5
+        h_freq: 35.0
+
+    - line_noise:
+        freq: 60.0
+
+    - bad_channels:
+        z_threshold: 3.0
+
+    - rereference:
+        method: average
+
+    - ica:
+        n_components: 20
+        method: fastica
+        eog_channels: [Fp1, Fp2]
+
+    - interpolate:
+
+    - bad_segments:
+        peak_amplitude: 150.0e-6
+
+    - plot:
+        title: After preprocessing
+        sensitivity: 50              # µV/div
+
+  # Metrics computed on the cleaned, annotated signal — steps run in order
+  feature_extraction:
+    - spectral_power:
+        events: [emdr, baseline]
+        method: welch
+        bands:
+          theta: [4, 8]
+          alpha: [8, 12]
+          beta:  [12, 30]
+        groupby: region              # channel | region
+        relative: true
+
+    - peak_power:
+        events: [emdr, baseline]
+        method: welch
+        bands:
+          theta: [4, 8]
+          alpha: [8, 12]
+        groupby: region
+
+    - faa:
+        events: [emdr, baseline]
+        method: welch
+        channels:
+          left: F3
+          right: F4
+
+output:
+  format: [csv, parquet]
+  path: ./data/processed

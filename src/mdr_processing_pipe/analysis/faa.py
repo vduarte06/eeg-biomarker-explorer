@@ -27,10 +27,11 @@ ALPHA_BAND = BANDS["alpha"]   # (8.0, 13.0)
 
 def compute_faa(
     raw: mne.io.Raw,
-    log: SessionLog,
+    log: SessionLog | None = None,
     method: str = "welch",
     ch_left: str = "F3",
     ch_right: str = "F4",
+    segments: list[tuple[float, float, str]] | None = None,
     **kwargs,
 ) -> pd.DataFrame:
     """Compute Frontal Alpha Asymmetry for every session segment.
@@ -39,14 +40,16 @@ def compute_faa(
     ----------
     raw : mne.io.Raw
         Preprocessed EEG recording. Must contain ch_left and ch_right channels.
-    log : SessionLog
-        Parsed session log.
+    log : SessionLog, optional
+        Parsed session log. Used when segments is None.
     method : 'periodogram' | 'welch' | 'multitaper'
         PSD estimation method.
     ch_left : str
         Left frontal channel name (default 'F3').
     ch_right : str
         Right frontal channel name (default 'F4').
+    segments : list of (onset, offset, kind), optional
+        Pre-computed segments. If provided, log is ignored.
     **kwargs
         Passed to the PSD estimator.
 
@@ -67,7 +70,8 @@ def compute_faa(
 
     fs = raw.info["sfreq"]
     rec_dur = raw.times[-1]
-    segments = extract_segments(log)
+    if segments is None:
+        segments = extract_segments(log)
 
     idx_l = raw.ch_names.index(ch_left)
     idx_r = raw.ch_names.index(ch_right)

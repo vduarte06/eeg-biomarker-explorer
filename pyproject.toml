@@ -2,17 +2,38 @@
 name = "mdr-processing-pipe"
 version = "0.1.0"
 description = "EEG processing pipeline with MNE for MDR psychology research"
+readme = "README.md"
+license = { text = "MIT" }
 authors = [
-    {name = "Vinicius Duarte",email = "viniciusduarte06@gmail.com"}
+    {name = "Vinicius Duarte", email = "viniciusduarte06@gmail.com"}
 ]
-requires-python = "^3.11"
+requires-python = ">=3.11"
+keywords = ["eeg", "mne", "emdr", "neuroscience", "signal-processing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
 dependencies = [
-    "mne (>=1.12.1,<2.0.0)",
-    "pandas (>=3.0.3,<4.0.0)",
-    "pyyaml (>=6.0.3,<7.0.0)",
-    "scikit-learn (>=1.8.0,<2.0.0)"
+    "mne>=1.12.1,<2.0.0",
+    "pandas>=3.0.3,<4.0.0",
+    "pyyaml>=6.0.3,<7.0.0",
+    "scikit-learn>=1.8.0,<2.0.0",
+    "pyarrow>=20.0.0,<21.0.0",
+    "pydantic (>=2.13.4,<3.0.0)",
 ]
 
+[project.scripts]
+mdr-pipe = "mdr_processing_pipe.runner:cli"
+
+[project.urls]
+Homepage = "https://github.com/viniciusduarte06/mdr-processing-pipe"
+Repository = "https://github.com/viniciusduarte06/mdr-processing-pipe"
+Issues = "https://github.com/viniciusduarte06/mdr-processing-pipe/issues"
 
 [tool.poetry]
 packages = [{include = "mdr_processing_pipe", from = "src"}]

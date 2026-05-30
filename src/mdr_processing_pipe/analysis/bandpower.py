@@ -113,23 +113,21 @@ def peak_bandpower(
 
 def run_peak_analysis(
     raw: mne.io.Raw,
-    log: SessionLog,
+    log: SessionLog | None = None,
     method: str = "welch",
     bands: dict[str, tuple[float, float]] | None = None,
+    segments: list[tuple[float, float, str]] | None = None,
     **kwargs,
 ) -> pd.DataFrame:
     """Compute per-channel peak PSD power and peak frequency for every session segment.
 
-    For each band the function returns the maximum PSD value within the band
-    and the frequency at which that maximum occurs. This complements
-    run_band_analysis (integral-based) with spectral peak information.
-
     Parameters
     ----------
     raw : mne.io.Raw
-    log : SessionLog
+    log : SessionLog, optional. Used when segments is None.
     method : 'periodogram' | 'welch' | 'multitaper'
     bands : dict mapping band name → (low_hz, high_hz). Defaults to BANDS.
+    segments : list of (onset, offset, kind), optional. Overrides log.
 
     Returns
     -------
@@ -140,10 +138,12 @@ def run_peak_analysis(
     if bands is None:
         bands = BANDS
 
+    if segments is None:
+        segments = extract_segments(log)
+
     fs = raw.info["sfreq"]
     ch_names = raw.ch_names
     rec_dur = raw.times[-1]
-    segments = extract_segments(log)
 
     rows = []
     kind_counters: dict[str, int] = {}
@@ -175,17 +175,27 @@ def run_peak_analysis(
 
 def aggregate_peak_by_region(
     raw: mne.io.Raw,
-    log: SessionLog,
-    regions: dict[str, list[str]],
+    log: SessionLog | None = None,
+    regions: dict[str, list[str]] = None,
     method: str = "welch",
     bands: dict[str, tuple[float, float]] | None = None,
+    segments: list[tuple[float, float, str]] | None = None,
     **kwargs,
 ) -> pd.DataFrame:
     """Compute peak band power per cerebral region for every session segment.
 
     Channels within each region are averaged first, then peak power and peak
-    frequency are estimated on the averaged signal (consistent with
-    aggregate_by_region). Regions with no matching channels are silently skipped.
+    frequency are estimated on the averaged signal. Regions with no matching
+    channels are silently skipped.
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+    log : SessionLog, optional. Used when segments is None.
+    regions : dict mapping region name → list of channel names.
+    method : 'periodogram' | 'welch' | 'multitaper'
+    bands : dict mapping band name → (low_hz, high_hz). Defaults to BANDS.
+    segments : list of (onset, offset, kind), optional. Overrides log.
 
     Returns
     -------
@@ -196,10 +206,12 @@ def aggregate_peak_by_region(
     if bands is None:
         bands = BANDS
 
+    if segments is None:
+        segments = extract_segments(log)
+
     fs = raw.info["sfreq"]
     ch_index = {ch: i for i, ch in enumerate(raw.ch_names)}
     rec_dur = raw.times[-1]
-    segments = extract_segments(log)
 
     region_indices = {
         name: [ch_index[ch] for ch in chs if ch in ch_index]
@@ -241,10 +253,11 @@ def aggregate_peak_by_region(
 
 def run_band_analysis(
     raw: mne.io.Raw,
-    log: SessionLog,
+    log: SessionLog | None = None,
     method: str = "welch",
     bands: dict[str, tuple[float, float]] | None = None,
     relative: bool = True,
+    segments: list[tuple[float, float, str]] | None = None,
     **kwargs,
 ) -> pd.DataFrame:
     """Compute per-electrode relative bandpower for every session segment.
@@ -252,15 +265,12 @@ def run_band_analysis(
     Parameters
     ----------
     raw : mne.io.Raw
-        Preprocessed EEG recording.
-    log : SessionLog
-        Parsed session log (list of (time_str, label) tuples).
+    log : SessionLog, optional. Used when segments is None.
     method : 'periodogram' | 'welch' | 'multitaper'
     bands : dict mapping band name → (low_hz, high_hz). Defaults to BANDS.
     relative : bool
-        Passed to bandpower().
-    **kwargs
-        Passed to the PSD estimator.
+    segments : list of (onset, offset, kind), optional. Overrides log.
+    **kwargs : passed to the PSD estimator.
 
     Returns
     -------
@@ -270,10 +280,12 @@ def run_band_analysis(
     if bands is None:
         bands = BANDS
 
+    if segments is None:
+        segments = extract_segments(log)
+
     fs = raw.info["sfreq"]
     ch_names = raw.ch_names
     rec_dur = raw.times[-1]
-    segments = extract_segments(log)
 
     rows = []
     kind_counters: dict[str, int] = {}
@@ -305,33 +317,29 @@ def run_band_analysis(
 
 def aggregate_by_region(
     raw: mne.io.Raw,
-    log: SessionLog,
-    regions: dict[str, list[str]],
+    log: SessionLog | None = None,
+    regions: dict[str, list[str]] = None,
     method: str = "welch",
     bands: dict[str, tuple[float, float]] | None = None,
     relative: bool = True,
+    segments: list[tuple[float, float, str]] | None = None,
     **kwargs,
 ) -> pd.DataFrame:
     """Compute bandpower per cerebral region for every session segment.
 
-    For each region the time-series of its channels are averaged first, then
-    a single PSD is estimated on the averaged signal (Option A aggregation).
-    Channels in a region that are absent from the recording are silently skipped;
-    a region with no matching channels is omitted from the output.
+    Channels within each region are averaged first, then a single PSD is
+    estimated on the averaged signal (Option A aggregation).
 
     Parameters
     ----------
     raw : mne.io.Raw
-        Preprocessed EEG recording.
-    log : SessionLog
-        Parsed session log.
+    log : SessionLog, optional. Used when segments is None.
     regions : dict mapping region name → list of channel names.
     method : 'periodogram' | 'welch' | 'multitaper'
     bands : dict mapping band name → (low_hz, high_hz). Defaults to BANDS.
     relative : bool
-        Passed to bandpower().
-    **kwargs
-        Passed to the PSD estimator.
+    segments : list of (onset, offset, kind), optional. Overrides log.
+    **kwargs : passed to the PSD estimator.
 
     Returns
     -------
@@ -341,10 +349,12 @@ def aggregate_by_region(
     if bands is None:
         bands = BANDS
 
+    if segments is None:
+        segments = extract_segments(log)
+
     fs = raw.info["sfreq"]
     ch_index = {ch: i for i, ch in enumerate(raw.ch_names)}
     rec_dur = raw.times[-1]
-    segments = extract_segments(log)
 
     # Pre-resolve channel indices per region (skip missing channels)
     region_indices: dict[str, list[int]] = {
@@ -391,7 +401,10 @@ def aggregate_by_region(
 def save_analysis(df: pd.DataFrame, path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(path, index=False)
+    if path.suffix == ".parquet":
+        df.to_parquet(path, index=False)
+    else:
+        df.to_csv(path, index=False)
 
 
 def plot_band_analysis(df: pd.DataFrame, group_col: str = "channel") -> plt.Figure:
