@@ -105,13 +105,16 @@ data/processed/
   faa.parquet
 ```
 
+## Requirements
+
+- **Python** ≥ 3.11
+- **[Poetry](https://python-poetry.org/)** — install 
+
+Runtime libraries (installed with `poetry install`): MNE ≥ 1.12, pandas, PyYAML, scikit-learn, pyarrow, pydantic.
+
 ## Development
 
 ```bash
 poetry install
 poetry run pre-commit install   # black + lint hooks on every commit
 ```
-
-## Requirements
-
-Python ≥ 3.11 · MNE ≥ 1.12 · pandas · PyYAML · scikit-learn · pyarrow · pydantic
