@@ -6,7 +6,7 @@
 # https://www.sciencedirect.com/science/article/abs/pii/S1388245723006934
 #
 # Equations implemented:
-#   eq1 — ln(F4) - ln(F3)                              Fox et al., 1995
+#   eq1 — ln(F4) - ln(F3)                              Fox et al., 1995 ++used
 #   eq2 — (F4 - F3) / (F3 + F4)                        Allen et al., 2004
 #   eq3 — (ln(F4) - ln(F3)) / (ln(F3) + ln(F4))        O'Reilly et al., 2017
 #   eq4 — ln(rel(F4)) - ln(rel(F3))                     Harrewijn et al., 2019

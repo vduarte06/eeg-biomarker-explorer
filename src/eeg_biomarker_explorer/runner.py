@@ -212,13 +212,18 @@ class PipelineRunner:
             return rereference(raw, ref=cfg["method"])
 
         elif kind == "ica":
-            print(f"{label}  ({cfg['n_components']} components, {cfg['method']})")
+            print(
+                f"{label}  ({cfg['n_components']} components, {cfg['method']}, "
+                f"fit filter {cfg['l_freq']}–{cfg['h_freq']} Hz)"
+            )
             return run_ica(
                 raw,
                 n_components=cfg["n_components"],
                 method=cfg["method"],
                 eog_channels=cfg.get("eog_channels"),
                 eog_threshold=cfg.get("eog_threshold", 3.0),
+                l_freq=cfg["l_freq"],
+                h_freq=cfg["h_freq"],
             )
 
         elif kind == "interpolate":

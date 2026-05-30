@@ -11,10 +11,10 @@ input:
     baseline: INTROCEPTION
 
   regions:
-    frontal:   [EEG Fp1, EEG Fp2, EEG F3, EEG F4, EEG Fz, EEG F7, EEG F8] # notice that the channel names are EEG prefixed in our EDF file
+    frontal:   [EEG Fp1, EEG Fp2, EEG F3, EEG F4, EEG Fz] # notice that the channel names are EEG prefixed in our EDF file
     central:   [EEG C3, EEG Cz, EEG C4]
-    temporal:  [EEG T7, EEG T8]
-    parietal:  [EEG P3, EEG P4, EEG Pz, EEG P7, EEG P8]
+    temporal:  [EEG F7, EEG F8, EEG T3, EEG T4, EEG F9, EEG F10, EEG P10, EEG P9]
+    parietal:  [EEG P3, EEG P4, EEG Pz]
     occipital: [EEG O1, EEG O2]
 
 

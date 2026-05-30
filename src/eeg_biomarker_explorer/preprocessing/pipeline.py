@@ -68,11 +68,13 @@ def run_ica(
     method: str = "fastica",
     eog_channels: list[str] | None = None,
     eog_threshold: float | str = 3.0,
+    l_freq: float = 1.0,
+    h_freq: float | None = None,
 ) -> mne.io.Raw:
     """Fit ICA, auto-detect EOG components, and apply to raw.
 
     Follows the MNE recommended workflow:
-    - Fit on a 1 Hz HP-filtered copy (removes slow drifts that hurt ICA)
+    - Fit on a filtered copy
     - Apply to the original raw (preserves low-frequency content)
     - Test each EOG surrogate channel independently and union the results,
       so a blink component caught by Fp1 OR Fp2 is excluded.
@@ -83,8 +85,9 @@ def run_ica(
         Fp1/Fp2 are typical proxies when no dedicated EOG channel exists.
     eog_threshold : z-score threshold for find_bads_eog. Default 3.0.
         Lower (e.g. 2.5) is more aggressive. Use 'auto' for adaptive tuning.
+    l_freq, h_freq : bandpass cutoffs (Hz) for the ICA fit copy.
     """
-    raw_hp = raw.copy().filter(l_freq=1.0, h_freq=None, verbose=False)
+    raw_hp = raw.copy().filter(l_freq=l_freq, h_freq=h_freq, verbose=False)
 
     ica = ICA(
         n_components=n_components,
