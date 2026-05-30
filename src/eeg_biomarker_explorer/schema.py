@@ -14,14 +14,10 @@ class DatasetConfig(BaseModel):
     session_log: str | None = None
 
 
-class EventConfig(BaseModel):
-    annotation: str
-
-
 class InputConfig(BaseModel):
     dataset: DatasetConfig
-    events:  dict[str, EventConfig] = {}
-    regions: dict[str, list[str]]   = {}
+    events:  dict[str, str]       = {}   # friendly_name → annotation_label
+    regions: dict[str, list[str]] = {}
 
 
 class PipelineStep(BaseModel):

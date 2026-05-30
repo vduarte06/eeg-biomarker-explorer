@@ -1,14 +1,14 @@
 [project]
-name = "mdr-processing-pipe"
+name = "eeg-biomarker-explorer"
 version = "0.1.0"
-description = "EEG processing pipeline with MNE for MDR psychology research"
+description = "Declarative EEG biomarker analysis pipeline built on MNE-Python"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
     {name = "Vinicius Duarte", email = "viniciusduarte06@gmail.com"}
 ]
 requires-python = ">=3.11"
-keywords = ["eeg", "mne", "emdr", "neuroscience", "signal-processing"]
+keywords = ["eeg", "mne", "emdr", "biomarker", "neuroscience", "signal-processing"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -24,19 +24,19 @@ dependencies = [
     "pyyaml>=6.0.3,<7.0.0",
     "scikit-learn>=1.8.0,<2.0.0",
     "pyarrow>=20.0.0,<21.0.0",
-    "pydantic (>=2.13.4,<3.0.0)",
+    "pydantic>=2.13.4,<3.0.0",
 ]
 
 [project.scripts]
-mdr-pipe = "mdr_processing_pipe.runner:cli"
+eeg-pipe = "eeg_biomarker_explorer.runner:cli"
 
 [project.urls]
-Homepage = "https://github.com/viniciusduarte06/mdr-processing-pipe"
-Repository = "https://github.com/viniciusduarte06/mdr-processing-pipe"
-Issues = "https://github.com/viniciusduarte06/mdr-processing-pipe/issues"
+Homepage = "https://github.com/viniciusduarte06/eeg-biomarker-explorer"
+Repository = "https://github.com/viniciusduarte06/eeg-biomarker-explorer"
+Issues = "https://github.com/viniciusduarte06/eeg-biomarker-explorer/issues"
 
 [tool.poetry]
-packages = [{include = "mdr_processing_pipe", from = "src"}]
+packages = [{include = "eeg_biomarker_explorer", from = "src"}]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

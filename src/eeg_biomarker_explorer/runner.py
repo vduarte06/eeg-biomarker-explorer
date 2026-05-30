@@ -17,9 +17,9 @@ import matplotlib.pyplot as plt
 import mne
 import pandas as pd
 
-from mdr_processing_pipe.preprocessing.loader import load_sample, load_raw
-from mdr_processing_pipe.preprocessing.filters import bandpass
-from mdr_processing_pipe.preprocessing.pipeline import (
+from eeg_biomarker_explorer.preprocessing.loader import load_sample, load_raw
+from eeg_biomarker_explorer.preprocessing.filters import bandpass
+from eeg_biomarker_explorer.preprocessing.pipeline import (
     remove_line_noise,
     detect_bad_channels,
     rereference,
@@ -27,21 +27,21 @@ from mdr_processing_pipe.preprocessing.pipeline import (
     interpolate_bad_channels,
     remove_bad_segments,
 )
-from mdr_processing_pipe.analysis.bandpower import (
+from eeg_biomarker_explorer.analysis.bandpower import (
     run_band_analysis,
     run_peak_analysis,
     aggregate_by_region,
     aggregate_peak_by_region,
     save_analysis,
 )
-from mdr_processing_pipe.analysis.faa import compute_faa
-from mdr_processing_pipe.utils.session_log import (
+from eeg_biomarker_explorer.analysis.faa import compute_faa
+from eeg_biomarker_explorer.utils.session_log import (
     load_log,
     load_config,
     extract_segments,
     get_segments_from_raw,
 )
-from mdr_processing_pipe.schema import PipelineSchema
+from eeg_biomarker_explorer.schema import PipelineSchema
 
 _PREPROCESSING_STEPS  = {"filter", "line_noise", "bad_channels", "rereference",
                           "ica", "interpolate", "bad_segments", "plot"}

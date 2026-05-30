@@ -9,7 +9,7 @@ from scipy.integrate import simpson
 from scipy.signal import periodogram, welch
 from mne.time_frequency import psd_array_multitaper
 
-from mdr_processing_pipe.utils.session_log import SessionLog, extract_segments
+from eeg_biomarker_explorer.utils.session_log import SessionLog, extract_segments
 
 
 BANDS: dict[str, tuple[float, float]] = {

@@ -7,10 +7,8 @@ input:
     session_log: ./data/raw/events.json
 
   events:
-    emdr:
-      annotation: EMDR_T
-    baseline:
-      annotation: INTROCEPTION
+    emdr:     EMDR_T
+    baseline: INTROCEPTION
 
   regions:
     frontal:   [Fp1, Fp2, F3, F4, Fz, F7, F8]

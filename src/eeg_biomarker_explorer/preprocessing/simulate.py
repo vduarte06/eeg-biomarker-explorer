@@ -1,7 +1,7 @@
 import numpy as np
 import mne
 
-from mdr_processing_pipe.utils.session_log import SessionLog, extract_segments, session_duration
+from eeg_biomarker_explorer.utils.session_log import SessionLog, extract_segments, session_duration
 
 CH_NAMES = [
     "Fp1", "Fp2", "F7", "F3", "Fz", "F4", "F8",

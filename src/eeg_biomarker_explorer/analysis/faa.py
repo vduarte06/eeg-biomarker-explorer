@@ -19,8 +19,8 @@ import numpy as np
 import pandas as pd
 import mne
 
-from mdr_processing_pipe.analysis.bandpower import bandpower, BANDS
-from mdr_processing_pipe.utils.session_log import SessionLog, extract_segments
+from eeg_biomarker_explorer.analysis.bandpower import bandpower, BANDS
+from eeg_biomarker_explorer.utils.session_log import SessionLog, extract_segments
 
 ALPHA_BAND = BANDS["alpha"]   # (8.0, 13.0)
 
