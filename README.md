@@ -131,10 +131,10 @@ eeg-pipe epochs data/raw/subject01.edf \
 Cut an EDF to a wall-clock time window (UTC) and save a new file:
 
 ```bash
-eeg-pipe crop data/raw/subject01.edf \
-    --start 09:15 \
-    --end   09:45 \
-    --output data/raw/subject01_cropped.edf
+eeg-pipe crop data/raw/01.edf \
+    --start 09:50 \
+    --end   12:00 \
+    --output data/raw/01__baseline.edf
 ```
 
 Times must match the UTC clock time embedded in the EDF header (`meas_date`).

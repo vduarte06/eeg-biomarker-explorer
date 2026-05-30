@@ -59,6 +59,7 @@ _PREPROCESSING_STEPS = {
     "bad_segment_annotation",
     "annotate",
     "plot",
+    "save",
 }
 _FEATURE_STEPS = {"spectral_power", "peak_power", "faa", "plot"}
 
@@ -78,6 +79,7 @@ _DEFAULTS = {
     "interpolate": {},
     "bad_segment_annotation": {"peak_amplitude": 150e-6},
     "annotate": {"output": "./data/raw/user_epochs.json", "sensitivity": 50.0},
+    "save": {"suffix": "_after_ica", "format": "edf"},
     "plot": {
         "duration": 20,
         "n_channels": 20,
@@ -129,6 +131,7 @@ class PipelineRunner:
     def run(self) -> dict[str, pd.DataFrame]:
         inp = self.cfg.get("input", {})
 
+        self._input_path = inp["dataset"].get("path")
         raw = self._load_data(inp["dataset"])
 
         raw_events = inp.get("events", {})
@@ -304,6 +307,13 @@ class PipelineRunner:
             self._show_plot(raw, cfg, title)
             return raw
 
+        elif kind == "save":
+            suffix = cfg.get("suffix", "_after_ica")
+            fmt = cfg.get("format", "edf")
+            print(f"{label}  (suffix='{suffix}', format={fmt})")
+            self._save_raw_step(raw, suffix, fmt)
+            return raw
+
         print(f"{label}  [unknown — skipped]")
         return raw
 
@@ -321,6 +331,40 @@ class PipelineRunner:
             events_json = annotations_to_events_json(new_anns)
             save_user_events(events_json, self.root / output)
         return raw
+
+    def _save_raw_step(self, raw: mne.io.Raw, suffix: str, fmt: str) -> None:
+        if not self._input_path or self._input_path == "sample":
+            print("     [save] skipped — no input file path")
+            return
+        inp = self.root / self._input_path
+        out = inp.with_name(inp.stem + suffix + inp.suffix)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if fmt == "edf":
+            data = raw.get_data()
+            max_v = 9.999999
+            encodable = [
+                ch
+                for i, ch in enumerate(raw.ch_names)
+                if abs(data[i].min()) <= max_v and abs(data[i].max()) <= max_v
+            ]
+            dropped = [ch for ch in raw.ch_names if ch not in encodable]
+            if dropped:
+                print(
+                    f"     [save] dropped channels (range too large for EDF): {dropped}"
+                )
+                raw_out = raw.copy().pick(encodable)
+            else:
+                raw_out = raw
+            raw_out.export(
+                str(out),
+                fmt="edf",
+                physical_range="channelwise",
+                overwrite=True,
+                verbose=False,
+            )
+        else:
+            raw.save(str(out), overwrite=True, verbose=False)
+        print(f"     [save] → {out}")
 
     # ── feature extraction ────────────────────────────────────────────────────
 

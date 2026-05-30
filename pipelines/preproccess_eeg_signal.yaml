@@ -1,0 +1,70 @@
+version: 1
+
+# -----------------------------------------------------------
+# Step 1 — Preprocess and annotate epochs
+#
+# Run this pipeline first to clean the signal and mark the
+# time windows you want to analyse.  The selected epochs are
+# saved to data/raw/user_epochs.json and consumed by
+# emdr_session.yaml (step 2).
+# -----------------------------------------------------------
+input:
+
+  dataset:
+    path: ./data/raw/01_baseline.edf
+    exclude: [DC1+, DC2+, trx1+, trx2+, Flw1+, Flw2+]
+
+  events:
+    path:         ./data/raw/events.json
+    emdr_t:       EMDR_T
+    emdr_o:       EMDR_O
+    introception: INTROCEPTION
+
+  regions:
+    frontal:   [EEG Fp1, EEG Fp2, EEG F3, EEG F4, EEG Fz]
+    central:   [EEG C3, EEG Cz, EEG C4]
+    temporal:  [EEG F7, EEG F8, EEG T3, EEG T4, EEG F9, EEG F10, EEG P10, EEG P9]
+    parietal:  [EEG P3, EEG P4, EEG Pz]
+    occipital: [EEG O1, EEG O2]
+
+# -----------------------------------------------------------
+# Pipeline — steps run in order; insert plot anywhere
+# -----------------------------------------------------------
+pipeline:
+
+  preprocessing:
+    - filter:
+        l_freq: 1.0
+        h_freq: 35.0
+
+    - line_noise:
+        freq: 50.0
+
+    - bad_channels:
+        z_threshold: 3.0
+
+    - rereference:
+        method: average
+
+    - ica:
+        n_components: 20
+        method: fastica
+        eog_channels: [EEG Fp1, EEG Fp2]  # set to override auto-detection; omit to use dedicated EOG channels
+        eog_threshold: 3.0          # lower (e.g. 2.5) to catch more components
+
+    - save:
+        suffix: _after_ica
+        format: edf
+
+    - plot:
+        title: After ICA — review signal before annotating
+        sensitivity: 50
+        time_format: clock
+
+    - annotate:
+        output: ./data/raw/user_epochs.json
+        sensitivity: 50
+
+output:
+  format: [csv]
+  path: ./data/processed
