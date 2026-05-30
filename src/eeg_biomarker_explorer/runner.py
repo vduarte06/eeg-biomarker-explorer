@@ -9,6 +9,7 @@ Usage
 """
 
 import argparse
+import datetime
 import json
 import sys
 from pathlib import Path
@@ -16,6 +17,7 @@ from pathlib import Path
 import matplotlib
 import matplotlib.pyplot as plt
 import mne
+import numpy as np
 import pandas as pd
 
 from eeg_biomarker_explorer.preprocessing.loader import load_sample, load_raw
@@ -432,6 +434,68 @@ output:
 """
 
 
+def _parse_clock(hhmm: str, ref: datetime.datetime) -> datetime.datetime:
+    h, m = (int(x) for x in hhmm.split(":"))
+    candidate = ref.replace(hour=h, minute=m, second=0, microsecond=0)
+    if candidate < ref:
+        candidate += datetime.timedelta(days=1)
+    return candidate
+
+
+def crop_edf(input_path: str, start: str, end: str, output: str) -> None:
+    """Crop an EDF file between two HH:MM wall-clock times and save a new EDF."""
+    inp = Path(input_path)
+    out = Path(output)
+
+    raw = mne.io.read_raw_edf(str(inp), preload=False, verbose=False)
+    meas_date = raw.info["meas_date"]  # timezone-aware UTC datetime
+
+    t_start = _parse_clock(start, meas_date)
+    t_end = _parse_clock(end, meas_date)
+
+    tmin = (t_start - meas_date).total_seconds()
+    tmax = (t_end - meas_date).total_seconds()
+
+    rec_dur = raw.times[-1]
+    if tmin < 0 or tmax > rec_dur:
+        print(
+            f"Error: window [{start}–{end}] maps to [{tmin:.0f}s–{tmax:.0f}s] but "
+            f"recording is {rec_dur:.0f}s long (starts {meas_date.strftime('%H:%M')} UTC)."
+        )
+        sys.exit(1)
+
+    print(f"  input    : {inp}")
+    print(f"  start    : {start} UTC  →  {tmin:.0f}s from recording start")
+    print(f"  end      : {end} UTC  →  {tmax:.0f}s from recording start")
+    print(
+        f"  duration : {tmax - tmin:.0f}s  ({datetime.timedelta(seconds=int(tmax - tmin))})"
+    )
+    print(f"  output   : {out}")
+
+    raw.load_data(verbose=False)
+    raw.crop(tmin=tmin, tmax=tmax)
+
+    # EDF stores physical range as µV with an 8-char ASCII field (7 digits + sign).
+    # Channels whose |value| > ~10 V overflow the field; drop them with a warning.
+    data = raw.get_data()
+    max_v = 9.999999  # 9999999 µV fits in 7 chars, leaving room for '-'
+    encodable = [
+        ch
+        for i, ch in enumerate(raw.ch_names)
+        if abs(data[i].min()) <= max_v and abs(data[i].max()) <= max_v
+    ]
+    dropped = [ch for ch in raw.ch_names if ch not in encodable]
+    if dropped:
+        print(f"  dropped  : {dropped}  (physical range too large for EDF format)")
+        raw.pick(encodable)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    raw.export(
+        str(out), fmt="edf", physical_range="channelwise", overwrite=True, verbose=False
+    )
+    print("  done.")
+
+
 def new_pipeline(path: str) -> None:
     dest = Path(path)
     if dest.exists():
@@ -459,11 +523,23 @@ def cli() -> None:
         "path", help="Destination path (e.g. pipelines/my_study.yaml)"
     )
 
+    crop_p = sub.add_parser("crop", help="Crop an EDF file to a clock-time window")
+    crop_p.add_argument("input", help="Path to source EDF file")
+    crop_p.add_argument(
+        "--start", required=True, metavar="HH:MM", help="Start time (UTC)"
+    )
+    crop_p.add_argument("--end", required=True, metavar="HH:MM", help="End time (UTC)")
+    crop_p.add_argument(
+        "--output", "-o", required=True, metavar="FILE", help="Output EDF path"
+    )
+
     args = parser.parse_args()
     if args.cmd == "run":
         PipelineRunner(args.pipeline).run()
     elif args.cmd == "new":
         new_pipeline(args.path)
+    elif args.cmd == "crop":
+        crop_edf(args.input, args.start, args.end, args.output)
     else:
         parser.print_help()
         sys.exit(1)

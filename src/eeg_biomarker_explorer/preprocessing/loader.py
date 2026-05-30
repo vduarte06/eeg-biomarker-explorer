@@ -21,7 +21,9 @@ def load_sample() -> mne.io.Raw:
 
 
 def _rename_to_1020(raw: mne.io.Raw) -> None:
-    """Rename channels to the nearest standard 10-20 label in-place."""
+    # TODO: only needed because the MNE sample dataset uses generic names (EEG 001, …)
+    # instead of 10-20 labels. Consider switching the sample to groupby: channel so
+    # region grouping (and this rename) can be removed entirely.
     montage = mne.channels.make_standard_montage("standard_1020")
     std_pos = montage.get_positions()["ch_pos"]
     std_names = list(std_pos.keys())

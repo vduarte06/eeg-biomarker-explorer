@@ -3,7 +3,7 @@ version: 1
 input:
 
   dataset:
-    path: sample                     # "sample" | path to .edf / .fif / .bdf / .set / .vhdr
+    path: ./data/raw/01_emdr_session.edf                     # "sample" | path to .edf / .fif / .bdf / .set / .vhdr
 
   events:
     path:     ./data/raw/events.json  # session log with timestamps → annotations
@@ -42,7 +42,7 @@ pipeline:
     - ica:
         n_components: 20
         method: fastica
-        # eog_channels: [Fp1, Fp2]  # set to override auto-detection; omit to use dedicated EOG channels
+        eog_channels: [Fp1, Fp2]  # set to override auto-detection; omit to use dedicated EOG channels
         eog_threshold: 3.0          # lower (e.g. 2.5) to catch more components
 
     # - interpolate:
