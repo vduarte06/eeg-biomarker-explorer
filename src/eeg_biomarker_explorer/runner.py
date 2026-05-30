@@ -45,6 +45,7 @@ from eeg_biomarker_explorer.utils.session_log import (
     load_config,
     extract_segments,
     get_segments_from_raw,
+    parse_time,
 )
 from eeg_biomarker_explorer.schema import PipelineSchema
 
@@ -95,6 +96,26 @@ _DEFAULTS = {
     "peak_power": {"events": [], "method": "welch", "bands": {}, "groupby": "region"},
     "faa": {"events": [], "method": "welch", "channels": {"left": "F3", "right": "F4"}},
 }
+
+
+def _clock_to_edf_onset(
+    raw: mne.io.Raw, log: list, onset_rel_to_session: float
+) -> float:
+    """Convert a session-relative onset (seconds from START_SESSION) to an EDF-relative onset.
+
+    events.json stores absolute wall-clock times. extract_segments converts those to
+    seconds relative to START_SESSION. This function adds the offset between EDF
+    meas_date and START_SESSION so the onset is correctly anchored in the recording.
+    """
+    meas_date = raw.info.get("meas_date")
+    if meas_date is None:
+        return onset_rel_to_session
+    t0_str = next(t for t, label in log if label == "START_SESSION")
+    t0 = parse_time(t0_str)
+    meas = meas_date.replace(tzinfo=None)
+    t0_full = t0.replace(year=meas.year, month=meas.month, day=meas.day)
+    session_offset = (t0_full - meas).total_seconds()
+    return onset_rel_to_session + session_offset
 
 
 class PipelineRunner:
@@ -187,7 +208,11 @@ class PipelineRunner:
         log = load_log(self.root / log_path)
         segments = extract_segments(log)
         rec_dur = raw.times[-1]
-        visible = [(s, e, k) for s, e, k in segments if s < rec_dur]
+        adjusted = [
+            (_clock_to_edf_onset(raw, log, s), _clock_to_edf_onset(raw, log, e), k)
+            for s, e, k in segments
+        ]
+        visible = [(s, e, k) for s, e, k in adjusted if 0 <= s < rec_dur]
         raw.set_annotations(
             mne.Annotations(
                 onset=[s for s, e, k in visible],
@@ -588,7 +613,11 @@ def annotate_command(
         log = load_log(Path(events_path))
         segments = extract_segments(log)
         rec_dur = raw.times[-1]
-        visible = [(s, e, k) for s, e, k in segments if s < rec_dur]
+        adjusted = [
+            (_clock_to_edf_onset(raw, log, s), _clock_to_edf_onset(raw, log, e), k)
+            for s, e, k in segments
+        ]
+        visible = [(s, e, k) for s, e, k in adjusted if 0 <= s < rec_dur]
         raw.set_annotations(
             mne.Annotations(
                 onset=[s for s, e, k in visible],
@@ -641,7 +670,11 @@ def epochs_command(
         log = load_log(Path(events_path))
         segments = extract_segments(log)
         rec_dur = raw.times[-1]
-        visible = [(s, e, k) for s, e, k in segments if s < rec_dur]
+        adjusted = [
+            (_clock_to_edf_onset(raw, log, s), _clock_to_edf_onset(raw, log, e), k)
+            for s, e, k in segments
+        ]
+        visible = [(s, e, k) for s, e, k in adjusted if 0 <= s < rec_dur]
         raw.set_annotations(
             mne.Annotations(
                 onset=[s for s, e, k in visible],
