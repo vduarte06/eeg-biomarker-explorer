@@ -1,0 +1,72 @@
+version: 1
+
+# -----------------------------------------------------------
+# Step 2 — Feature extraction
+#
+# Run after view_eeg_signal.yaml has produced user_epochs.json.
+# Add your annotated label names under user_events below.
+# -----------------------------------------------------------
+input:
+
+  dataset:
+    path: ./data/raw/01_baseline_after_ica.edf
+
+  events:
+    path:         ./data/raw/events.json
+    emdr_t:       EMDR_T
+    emdr_o:       EMDR_O
+    introception: INTROCEPTION
+
+  user_events:
+    path: ./data/raw/user_epochs.json
+    # Map the label names you typed during annotation, e.g.:
+    baseline: BASELINE
+    task:     TASK
+
+  regions:
+    frontal:   [EEG Fp1, EEG Fp2, EEG F3, EEG F4, EEG Fz]
+    central:   [EEG C3, EEG Cz, EEG C4]
+    temporal:  [EEG F7, EEG F8, EEG T3, EEG T4, EEG F9, EEG F10, EEG P10, EEG P9]
+    parietal:  [EEG P3, EEG P4, EEG Pz]
+    occipital: [EEG O1, EEG O2]
+
+
+pipeline:
+
+  preprocessing:
+    - plot:
+        title: After preprocessing
+        sensitivity: 50              # µV/div
+        time_format: clock
+
+
+  # Metrics computed on the cleaned, annotated signal — steps run in order
+  feature_extraction:
+    - spectral_power:
+        events: [baseline]
+        method: welch
+        bands:
+          theta: [4, 8]
+          alpha: [8, 12]
+          beta:  [12, 30]
+        groupby: region              # channel | region
+        relative: true
+
+    - peak_power:
+        events: [baseline]
+        method: welch
+        bands:
+          theta: [4, 8]
+          alpha: [8, 12]
+        groupby: region
+
+    - faa:
+        events: [baseline]
+        method: welch
+        channels:
+          left: EEG F3
+          right: EEG F4
+
+output:
+  format: [csv]
+  path: ./data/processed

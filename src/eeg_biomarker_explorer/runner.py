@@ -37,6 +37,7 @@ from eeg_biomarker_explorer.analysis.bandpower import (
     run_peak_analysis,
     aggregate_by_region,
     aggregate_peak_by_region,
+    append_segment_means,
     save_analysis,
 )
 from eeg_biomarker_explorer.analysis.faa import compute_faa
@@ -477,6 +478,7 @@ class PipelineRunner:
 
         print("\n── Output ─────────────────────────────────────────────────────")
         for name, df in self.results.items():
+            df = append_segment_means(df)
             for fmt in formats:
                 path = out_dir / f"{name}.{fmt}"
                 save_analysis(df, path)

@@ -398,6 +398,52 @@ def aggregate_by_region(
     return pd.DataFrame(rows)
 
 
+def append_segment_means(df: pd.DataFrame) -> pd.DataFrame:
+    """Append one log-scale mean row per (segment_kind, …group…) at the end of df.
+
+    Power columns (all values > 0, not *_freq or faa_*) use geometric mean:
+    exp(mean(log(x))). Frequency and FAA equation columns use arithmetic mean.
+    Appended rows have segment_kind = "{kind}_mean" and segment_idx = NaN.
+    """
+    group_cols = [
+        c
+        for c in df.columns
+        if c != "segment_idx" and not pd.api.types.is_numeric_dtype(df[c])
+    ]
+    numeric_cols = [
+        c
+        for c in df.columns
+        if pd.api.types.is_numeric_dtype(df[c]) and c != "segment_idx"
+    ]
+
+    mean_rows = []
+    for keys, group in df.groupby(group_cols, sort=False):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        row: dict = dict(zip(group_cols, keys))
+        row["segment_kind"] = f"{row['segment_kind']}_mean"
+        row["segment_idx"] = np.nan
+
+        for col in numeric_cols:
+            vals = group[col].dropna().to_numpy(dtype=float)
+            if len(vals) == 0:
+                row[col] = np.nan
+            elif col.endswith("_freq") or col.startswith("faa_"):
+                row[col] = float(np.mean(vals))
+            elif np.all(vals > 0):
+                row[col] = float(np.exp(np.mean(np.log(vals))))
+            else:
+                row[col] = float(np.mean(vals))
+
+        mean_rows.append(row)
+
+    if not mean_rows:
+        return df
+
+    mean_df = pd.DataFrame(mean_rows, columns=df.columns)
+    return pd.concat([df, mean_df], ignore_index=True)
+
+
 def save_analysis(df: pd.DataFrame, path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
