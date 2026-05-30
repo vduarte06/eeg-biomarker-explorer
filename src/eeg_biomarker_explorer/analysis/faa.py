@@ -22,7 +22,7 @@ import mne
 from eeg_biomarker_explorer.analysis.bandpower import bandpower, BANDS
 from eeg_biomarker_explorer.utils.session_log import SessionLog, extract_segments
 
-ALPHA_BAND = BANDS["alpha"]   # (8.0, 13.0)
+ALPHA_BAND = BANDS["alpha"]  # (8.0, 13.0)
 
 
 def compute_faa(
@@ -64,8 +64,7 @@ def compute_faa(
     missing = [ch for ch in (ch_left, ch_right) if ch not in raw.ch_names]
     if missing:
         raise ValueError(
-            f"Channels {missing} not found in recording. "
-            f"Available: {raw.ch_names}"
+            f"Channels {missing} not found in recording. " f"Available: {raw.ch_names}"
         )
 
     fs = raw.info["sfreq"]
@@ -87,14 +86,18 @@ def compute_faa(
         kind_counters[kind] = kind_counters.get(kind, -1) + 1
         seg_idx = kind_counters[kind]
 
-        data, _ = raw[:, raw.time_as_index(onset)[0]:raw.time_as_index(offset)[0]]
+        data, _ = raw[:, raw.time_as_index(onset)[0] : raw.time_as_index(offset)[0]]
 
         # Absolute alpha power for F3 and F4
-        abs_bp = bandpower(data[[idx_l, idx_r]], fs, method, ALPHA_BAND, relative=False, **kwargs)
+        abs_bp = bandpower(
+            data[[idx_l, idx_r]], fs, method, ALPHA_BAND, relative=False, **kwargs
+        )
         f3_abs, f4_abs = float(abs_bp[0]), float(abs_bp[1])
 
         # Relative alpha power for F3 and F4
-        rel_bp = bandpower(data[[idx_l, idx_r]], fs, method, ALPHA_BAND, relative=True, **kwargs)
+        rel_bp = bandpower(
+            data[[idx_l, idx_r]], fs, method, ALPHA_BAND, relative=True, **kwargs
+        )
         f3_rel, f4_rel = float(rel_bp[0]), float(rel_bp[1])
 
         # eq1: ln(F4) - ln(F3)                             Fox et al., 1995
@@ -109,17 +112,19 @@ def compute_faa(
         # eq4: ln(rel(F4)) - ln(rel(F3))                    Harrewijn et al., 2019
         eq4 = np.log(f4_rel) - np.log(f3_rel)
 
-        rows.append({
-            "segment_kind":  kind,
-            "segment_idx":   seg_idx,
-            "alpha_F3_abs":  f3_abs,
-            "alpha_F4_abs":  f4_abs,
-            "alpha_F3_rel":  f3_rel,
-            "alpha_F4_rel":  f4_rel,
-            "faa_eq1":       eq1,
-            "faa_eq2":       eq2,
-            "faa_eq3":       eq3,
-            "faa_eq4":       eq4,
-        })
+        rows.append(
+            {
+                "segment_kind": kind,
+                "segment_idx": seg_idx,
+                "alpha_F3_abs": f3_abs,
+                "alpha_F4_abs": f4_abs,
+                "alpha_F3_rel": f3_rel,
+                "alpha_F4_rel": f4_rel,
+                "faa_eq1": eq1,
+                "faa_eq2": eq2,
+                "faa_eq3": eq3,
+                "faa_eq4": eq4,
+            }
+        )
 
     return pd.DataFrame(rows)

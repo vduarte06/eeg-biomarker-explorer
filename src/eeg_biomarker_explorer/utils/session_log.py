@@ -3,7 +3,6 @@ import yaml
 from datetime import datetime
 from pathlib import Path
 
-
 SessionLog = list[tuple[str, str]]
 
 
@@ -82,7 +81,7 @@ def get_segments_from_raw(
     segments = []
     for ann in raw.annotations:
         if ann["description"] in label_set:
-            onset  = float(ann["onset"])
+            onset = float(ann["onset"])
             offset = onset + float(ann["duration"])
             segments.append((onset, offset, ann["description"]))
     return sorted(segments)

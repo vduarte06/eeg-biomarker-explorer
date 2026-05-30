@@ -14,8 +14,8 @@ import numpy as np
 import mne
 from mne.preprocessing import ICA
 
-
 # ── Step 1 ────────────────────────────────────────────────────────────────────
+
 
 def remove_line_noise(raw: mne.io.Raw, line_freq: float = 60.0) -> mne.io.Raw:
     """Notch filter at line frequency and its first harmonic."""
@@ -26,6 +26,7 @@ def remove_line_noise(raw: mne.io.Raw, line_freq: float = 60.0) -> mne.io.Raw:
 
 # ── Step 2 ────────────────────────────────────────────────────────────────────
 
+
 def detect_bad_channels(raw: mne.io.Raw, z_threshold: float = 3.0) -> mne.io.Raw:
     """Flag channels with abnormal or near-zero variance as bad.
 
@@ -35,8 +36,8 @@ def detect_bad_channels(raw: mne.io.Raw, z_threshold: float = 3.0) -> mne.io.Raw
     data = raw.get_data()
     stds = data.std(axis=1)
 
-    flat_mask  = stds < 1e-9
-    z_scores   = (stds - stds.mean()) / (stds.std() + 1e-30)
+    flat_mask = stds < 1e-9
+    z_scores = (stds - stds.mean()) / (stds.std() + 1e-30)
     noisy_mask = np.abs(z_scores) > z_threshold
 
     new_bads = [ch for ch, bad in zip(raw.ch_names, flat_mask | noisy_mask) if bad]
@@ -51,6 +52,7 @@ def detect_bad_channels(raw: mne.io.Raw, z_threshold: float = 3.0) -> mne.io.Raw
 
 # ── Step 3 ────────────────────────────────────────────────────────────────────
 
+
 def rereference(raw: mne.io.Raw, ref: str = "average") -> mne.io.Raw:
     """Apply EEG re-referencing (average, REST, or a named channel)."""
     raw.set_eeg_reference(ref, projection=False, verbose=False)
@@ -58,6 +60,7 @@ def rereference(raw: mne.io.Raw, ref: str = "average") -> mne.io.Raw:
 
 
 # ── Step 4 ────────────────────────────────────────────────────────────────────
+
 
 def run_ica(
     raw: mne.io.Raw,
@@ -98,6 +101,7 @@ def run_ica(
 
 # ── Step 5 ────────────────────────────────────────────────────────────────────
 
+
 def interpolate_bad_channels(raw: mne.io.Raw) -> mne.io.Raw:
     """Spherical spline interpolation of channels in raw.info['bads']."""
     if raw.info["bads"]:
@@ -110,6 +114,7 @@ def interpolate_bad_channels(raw: mne.io.Raw) -> mne.io.Raw:
 
 # ── Step 6 ────────────────────────────────────────────────────────────────────
 
+
 def remove_bad_segments(
     raw: mne.io.Raw,
     peak_amplitude: float = 150e-6,
@@ -120,11 +125,14 @@ def remove_bad_segments(
     )
     n = len(annots)
     raw.set_annotations(raw.annotations + annots)
-    print(f"  [bad segments] annotated {n} segment(s) above {peak_amplitude*1e6:.0f} µV")
+    print(
+        f"  [bad segments] annotated {n} segment(s) above {peak_amplitude*1e6:.0f} µV"
+    )
     return raw
 
 
 # ── Step 7 ────────────────────────────────────────────────────────────────────
+
 
 def epoch_by_annotations(
     raw: mne.io.Raw,
@@ -138,16 +146,22 @@ def epoch_by_annotations(
     """
     events, event_id = mne.events_from_annotations(raw, verbose=False)
     # Keep only session-phase events
-    phase_id = {k: v for k, v in event_id.items()
-                if any(k.startswith(p) for p in ("EMDR_T", "EMDR_O", "INTROCEPTION"))}
+    phase_id = {
+        k: v
+        for k, v in event_id.items()
+        if any(k.startswith(p) for p in ("EMDR_T", "EMDR_O", "INTROCEPTION"))
+    }
 
     if not phase_id:
         print("  [epoching] no phase annotations found — returning None")
         return None
 
     epochs = mne.Epochs(
-        raw, events, event_id=phase_id,
-        tmin=tmin, tmax=tmax,
+        raw,
+        events,
+        event_id=phase_id,
+        tmin=tmin,
+        tmax=tmax,
         baseline=None,
         reject_by_annotation=True,
         preload=True,
@@ -158,6 +172,7 @@ def epoch_by_annotations(
 
 
 # ── Full pipeline ─────────────────────────────────────────────────────────────
+
 
 def preprocess(
     raw: mne.io.Raw,
@@ -181,10 +196,7 @@ def preprocess(
     epochs : mne.Epochs or None
     """
     # Resolve re-reference key from either schema
-    ref = (
-        cfg.get("rereference", {}).get("method")
-        or cfg.get("reference", "average")
-    )
+    ref = cfg.get("rereference", {}).get("method") or cfg.get("reference", "average")
 
     print("\n── Preprocessing ─────────────────────────────────────────────")
 

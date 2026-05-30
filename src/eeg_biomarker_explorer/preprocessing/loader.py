@@ -27,7 +27,9 @@ def _rename_to_1020(raw: mne.io.Raw) -> None:
     std_names = list(std_pos.keys())
     std_coords = np.array(list(std_pos.values()))
 
-    ch_coords = np.array([raw.info["chs"][i]["loc"][:3] for i in range(len(raw.ch_names))])
+    ch_coords = np.array(
+        [raw.info["chs"][i]["loc"][:3] for i in range(len(raw.ch_names))]
+    )
     dists = cdist(ch_coords, std_coords)
 
     used: set[str] = set()
@@ -47,15 +49,17 @@ def load_raw(path: str | Path) -> mne.io.Raw:
     """Load a real EEG file. Supports .fif, .edf, .bdf, .set, .vhdr."""
     path = Path(path)
     readers = {
-        ".fif":  mne.io.read_raw_fif,
-        ".edf":  mne.io.read_raw_edf,
-        ".bdf":  mne.io.read_raw_bdf,
-        ".set":  mne.io.read_raw_eeglab,
+        ".fif": mne.io.read_raw_fif,
+        ".edf": mne.io.read_raw_edf,
+        ".bdf": mne.io.read_raw_bdf,
+        ".set": mne.io.read_raw_eeglab,
         ".vhdr": mne.io.read_raw_brainvision,
     }
     reader = readers.get(path.suffix.lower())
     if reader is None:
-        raise ValueError(f"Unsupported format '{path.suffix}'. Supported: {list(readers)}")
+        raise ValueError(
+            f"Unsupported format '{path.suffix}'. Supported: {list(readers)}"
+        )
     raw = reader(path, preload=True)
     raw.pick("eeg")
     return raw

@@ -1,19 +1,40 @@
 import numpy as np
 import mne
 
-from eeg_biomarker_explorer.utils.session_log import SessionLog, extract_segments, session_duration
+from eeg_biomarker_explorer.utils.session_log import (
+    SessionLog,
+    extract_segments,
+    session_duration,
+)
 
 CH_NAMES = [
-    "Fp1", "Fp2", "F7", "F3", "Fz", "F4", "F8",
-    "T7",  "C3",  "Cz", "C4", "T8",
-    "P7",  "P3",  "Pz", "P4", "P8",
-    "O1",  "O2",
+    "Fp1",
+    "Fp2",
+    "F7",
+    "F3",
+    "Fz",
+    "F4",
+    "F8",
+    "T7",
+    "C3",
+    "Cz",
+    "C4",
+    "T8",
+    "P7",
+    "P3",
+    "Pz",
+    "P4",
+    "P8",
+    "O1",
+    "O2",
 ]
 _POSTERIOR = {"O1", "O2", "P3", "P4", "Pz", "P7", "P8"}
-_FRONTAL   = {"Fp1", "Fp2", "F3", "F4", "Fz", "F7", "F8"}
+_FRONTAL = {"Fp1", "Fp2", "F3", "F4", "Fz", "F7", "F8"}
 
 
-def simulate_session(log: SessionLog, sfreq: int = 250, seed: int = 0) -> mne.io.RawArray:
+def simulate_session(
+    log: SessionLog, sfreq: int = 250, seed: int = 0
+) -> mne.io.RawArray:
     """Simulate a full-session EEG RawArray from a session log.
 
     Parameters
@@ -48,20 +69,20 @@ def simulate_session(log: SessionLog, sfreq: int = 250, seed: int = 0) -> mne.io
         alpha_amp = 15e-6 if ch in _POSTERIOR else 5e-6
         data[ci] = (
             _pink(n)
-            + _osc(10, n, alpha_amp)   # alpha
-            + _osc(20, n, 2e-6)        # beta
-            + _osc(6,  n, 1.5e-6)      # theta bg
+            + _osc(10, n, alpha_amp)  # alpha
+            + _osc(20, n, 2e-6)  # beta
+            + _osc(6, n, 1.5e-6)  # theta bg
         )
 
     for onset, offset, kind in segments:
-        s = int(onset  * sfreq)
+        s = int(onset * sfreq)
         e = min(int(offset * sfreq), n)
         length = e - s
 
         if kind == "EMDR_T":
             for ci in range(len(CH_NAMES)):
                 data[ci, s:e] += (
-                    _osc(6,  length, 10e-6)
+                    _osc(6, length, 10e-6)
                     - _osc(10, length, 6e-6)
                     + rng.normal(0, 2e-6, length)
                 )
@@ -82,8 +103,8 @@ def simulate_session(log: SessionLog, sfreq: int = 250, seed: int = 0) -> mne.io
     raw = mne.io.RawArray(data, info, verbose=False)
     raw.set_eeg_reference("average", projection=True)
 
-    onsets      = [s for s, _, _ in segments]
-    durations   = [e - s for s, e, _ in segments]
+    onsets = [s for s, _, _ in segments]
+    durations = [e - s for s, e, _ in segments]
     descriptions = [k for _, _, k in segments]
     raw.set_annotations(mne.Annotations(onsets, durations, descriptions))
 

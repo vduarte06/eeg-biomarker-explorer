@@ -16,12 +16,13 @@ class DatasetConfig(BaseModel):
 
 class InputConfig(BaseModel):
     dataset: DatasetConfig
-    events:  dict[str, str]       = {}   # friendly_name → annotation_label
+    events: dict[str, str] = {}  # friendly_name → annotation_label
     regions: dict[str, list[str]] = {}
 
 
 class PipelineStep(BaseModel):
     """A single pipeline step: a dict with exactly one key (the step type)."""
+
     root: dict[str, Any]
 
     @model_validator(mode="before")
@@ -43,8 +44,8 @@ class PipelineStep(BaseModel):
 
 
 class PipelineConfig(BaseModel):
-    preprocessing:       list[PipelineStep] = []
-    feature_extraction:  list[PipelineStep] = []
+    preprocessing: list[PipelineStep] = []
+    feature_extraction: list[PipelineStep] = []
 
     @field_validator("preprocessing", "feature_extraction", mode="before")
     @classmethod
@@ -54,7 +55,7 @@ class PipelineConfig(BaseModel):
 
 class OutputConfig(BaseModel):
     format: list[str] = ["csv"]
-    path:   str       = "./data/processed"
+    path: str = "./data/processed"
 
     @field_validator("format")
     @classmethod
@@ -67,7 +68,7 @@ class OutputConfig(BaseModel):
 
 
 class PipelineSchema(BaseModel):
-    version:  int          = 1
-    input:    InputConfig
+    version: int = 1
+    input: InputConfig
     pipeline: PipelineConfig = PipelineConfig()
-    output:   OutputConfig    = OutputConfig()
+    output: OutputConfig = OutputConfig()

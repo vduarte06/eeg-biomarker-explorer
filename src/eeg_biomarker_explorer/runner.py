@@ -43,34 +43,51 @@ from eeg_biomarker_explorer.utils.session_log import (
 )
 from eeg_biomarker_explorer.schema import PipelineSchema
 
-_PREPROCESSING_STEPS  = {"filter", "line_noise", "bad_channels", "rereference",
-                          "ica", "interpolate", "bad_segments", "plot"}
-_FEATURE_STEPS        = {"spectral_power", "peak_power", "faa", "plot"}
+_PREPROCESSING_STEPS = {
+    "filter",
+    "line_noise",
+    "bad_channels",
+    "rereference",
+    "ica",
+    "interpolate",
+    "bad_segments",
+    "plot",
+}
+_FEATURE_STEPS = {"spectral_power", "peak_power", "faa", "plot"}
 
 _DEFAULTS = {
-    "filter":         {"l_freq": 1.0, "h_freq": 35.0},
-    "line_noise":     {"freq": 60.0},
-    "bad_channels":   {"z_threshold": 3.0},
-    "rereference":    {"method": "average"},
-    "ica":            {"n_components": 15, "method": "fastica", "eog_channels": None},
-    "interpolate":    {},
-    "bad_segments":   {"peak_amplitude": 150e-6},
-    "plot":           {"duration": 20, "n_channels": 20, "scalings": "auto",
-                       "title": None, "sensitivity": None},
-    "spectral_power": {"events": [], "method": "welch", "bands": {},
-                       "groupby": "region", "relative": True},
-    "peak_power":     {"events": [], "method": "welch", "bands": {}, "groupby": "region"},
-    "faa":            {"events": [], "method": "welch",
-                       "channels": {"left": "F3", "right": "F4"}},
+    "filter": {"l_freq": 1.0, "h_freq": 35.0},
+    "line_noise": {"freq": 60.0},
+    "bad_channels": {"z_threshold": 3.0},
+    "rereference": {"method": "average"},
+    "ica": {"n_components": 15, "method": "fastica", "eog_channels": None},
+    "interpolate": {},
+    "bad_segments": {"peak_amplitude": 150e-6},
+    "plot": {
+        "duration": 20,
+        "n_channels": 20,
+        "scalings": "auto",
+        "title": None,
+        "sensitivity": None,
+    },
+    "spectral_power": {
+        "events": [],
+        "method": "welch",
+        "bands": {},
+        "groupby": "region",
+        "relative": True,
+    },
+    "peak_power": {"events": [], "method": "welch", "bands": {}, "groupby": "region"},
+    "faa": {"events": [], "method": "welch", "channels": {"left": "F3", "right": "F4"}},
 }
 
 
 class PipelineRunner:
     def __init__(self, pipeline_path: str | Path):
         self.root = Path(pipeline_path).parent.parent
-        raw_cfg   = load_config(Path(pipeline_path))
-        self.schema  = PipelineSchema.model_validate(raw_cfg)
-        self.cfg     = raw_cfg                          # kept for step-level dispatch
+        raw_cfg = load_config(Path(pipeline_path))
+        self.schema = PipelineSchema.model_validate(raw_cfg)
+        self.cfg = raw_cfg  # kept for step-level dispatch
         self.results: dict[str, pd.DataFrame] = {}
 
     def run(self) -> dict[str, pd.DataFrame]:
@@ -80,15 +97,16 @@ class PipelineRunner:
         self._apply_session_log(raw, inp["dataset"])
 
         event_map = inp.get("events", {})
-        regions   = {
+        regions = {
             name: (cfg["channels"] if isinstance(cfg, dict) else cfg)
             for name, cfg in inp.get("regions", {}).items()
         }
 
         pipe = self.cfg.get("pipeline", {})
         self._run_preprocessing(raw, pipe.get("preprocessing", []))
-        self._run_feature_extraction(raw, pipe.get("feature_extraction", []),
-                                     event_map, regions)
+        self._run_feature_extraction(
+            raw, pipe.get("feature_extraction", []), event_map, regions
+        )
         self._save_outputs()
         return self.results
 
@@ -108,15 +126,17 @@ class PipelineRunner:
         log_path = dataset.get("session_log")
         if not log_path:
             return
-        log      = load_log(self.root / log_path)
+        log = load_log(self.root / log_path)
         segments = extract_segments(log)
-        rec_dur  = raw.times[-1]
-        visible  = [(s, e, k) for s, e, k in segments if s < rec_dur]
-        raw.set_annotations(mne.Annotations(
-            onset       = [s for s, e, k in visible],
-            duration    = [e - s for s, e, k in visible],
-            description = [k for s, e, k in visible],
-        ))
+        rec_dur = raw.times[-1]
+        visible = [(s, e, k) for s, e, k in segments if s < rec_dur]
+        raw.set_annotations(
+            mne.Annotations(
+                onset=[s for s, e, k in visible],
+                duration=[e - s for s, e, k in visible],
+                description=[k for s, e, k in visible],
+            )
+        )
         print(f"  log      : {len(visible)} annotation(s) applied")
 
     # ── preprocessing ─────────────────────────────────────────────────────────
@@ -124,13 +144,17 @@ class PipelineRunner:
     def _run_preprocessing(self, raw: mne.io.Raw, steps: list) -> None:
         if not steps:
             return
-        print(f"\n── Preprocessing ({len(steps)} step(s)) ────────────────────────────────")
+        print(
+            f"\n── Preprocessing ({len(steps)} step(s)) ────────────────────────────────"
+        )
         for i, step in enumerate(steps, 1):
             kind, cfg = next(iter(step.items()))
             cfg = {**_DEFAULTS.get(kind, {}), **(cfg or {})}
             raw = self._preprocess_step(raw, i, kind, cfg)
 
-    def _preprocess_step(self, raw: mne.io.Raw, idx: int, kind: str, cfg: dict) -> mne.io.Raw:
+    def _preprocess_step(
+        self, raw: mne.io.Raw, idx: int, kind: str, cfg: dict
+    ) -> mne.io.Raw:
         label = f"  {idx}. {kind}"
 
         if kind == "filter":
@@ -151,8 +175,12 @@ class PipelineRunner:
 
         elif kind == "ica":
             print(f"{label}  ({cfg['n_components']} components, {cfg['method']})")
-            return run_ica(raw, n_components=cfg["n_components"],
-                           method=cfg["method"], eog_channels=cfg.get("eog_channels"))
+            return run_ica(
+                raw,
+                n_components=cfg["n_components"],
+                method=cfg["method"],
+                eog_channels=cfg.get("eog_channels"),
+            )
 
         elif kind == "interpolate":
             print(f"{label}")
@@ -179,7 +207,9 @@ class PipelineRunner:
         if not steps:
             return
         all_segments = get_segments_from_raw(raw, event_map)
-        print(f"\n── Feature extraction ({len(steps)} step(s)) ──────────────────────────────")
+        print(
+            f"\n── Feature extraction ({len(steps)} step(s)) ──────────────────────────────"
+        )
         for i, step in enumerate(steps, 1):
             kind, cfg = next(iter(step.items()))
             cfg = {**_DEFAULTS.get(kind, {}), **(cfg or {})}
@@ -191,36 +221,57 @@ class PipelineRunner:
                 continue
 
             event_names = cfg.get("events") or list(event_map.keys())
-            requested   = {event_map[n]["annotation"] for n in event_names if n in event_map}
-            segs        = [s for s in all_segments if s[2] in requested]
-            method      = cfg.get("method", "welch")
-            bands       = {k: tuple(v) for k, v in cfg.get("bands", {}).items()} or None
-            groupby     = cfg.get("groupby", "region")
+            requested = {
+                event_map[n]["annotation"] for n in event_names if n in event_map
+            }
+            segs = [s for s in all_segments if s[2] in requested]
+            method = cfg.get("method", "welch")
+            bands = {k: tuple(v) for k, v in cfg.get("bands", {}).items()} or None
+            groupby = cfg.get("groupby", "region")
 
             print(f"  {i}. {kind}  ({groupby}, {len(segs)} segment(s))")
 
             if kind == "spectral_power":
                 relative = cfg.get("relative", True)
                 df = (
-                    aggregate_by_region(raw, regions=regions, method=method,
-                                        bands=bands, relative=relative, segments=segs)
-                    if groupby == "region" else
-                    run_band_analysis(raw, method=method, bands=bands,
-                                      relative=relative, segments=segs)
+                    aggregate_by_region(
+                        raw,
+                        regions=regions,
+                        method=method,
+                        bands=bands,
+                        relative=relative,
+                        segments=segs,
+                    )
+                    if groupby == "region"
+                    else run_band_analysis(
+                        raw,
+                        method=method,
+                        bands=bands,
+                        relative=relative,
+                        segments=segs,
+                    )
                 )
 
             elif kind == "peak_power":
                 df = (
-                    aggregate_peak_by_region(raw, regions=regions, method=method,
-                                             bands=bands, segments=segs)
-                    if groupby == "region" else
-                    run_peak_analysis(raw, method=method, bands=bands, segments=segs)
+                    aggregate_peak_by_region(
+                        raw, regions=regions, method=method, bands=bands, segments=segs
+                    )
+                    if groupby == "region"
+                    else run_peak_analysis(
+                        raw, method=method, bands=bands, segments=segs
+                    )
                 )
 
             elif kind == "faa":
                 ch = cfg.get("channels", {})
-                df = compute_faa(raw, method=method, segments=segs,
-                                 ch_left=ch.get("left", "F3"), ch_right=ch.get("right", "F4"))
+                df = compute_faa(
+                    raw,
+                    method=method,
+                    segments=segs,
+                    ch_left=ch.get("left", "F3"),
+                    ch_right=ch.get("right", "F4"),
+                )
 
             else:
                 print(f"     [unknown — skipped]")
@@ -234,10 +285,18 @@ class PipelineRunner:
         if matplotlib.get_backend().lower() in ("agg", ""):
             matplotlib.use("MacOSX")
         sensitivity = cfg.get("sensitivity")
-        scalings = ({"eeg": float(sensitivity) * 1e-6}
-                    if sensitivity is not None else cfg.get("scalings", "auto"))
-        raw.plot(duration=cfg.get("duration", 20), n_channels=cfg.get("n_channels", 20),
-                 scalings=scalings, title=title, block=False)
+        scalings = (
+            {"eeg": float(sensitivity) * 1e-6}
+            if sensitivity is not None
+            else cfg.get("scalings", "auto")
+        )
+        raw.plot(
+            duration=cfg.get("duration", 20),
+            n_channels=cfg.get("n_channels", 20),
+            scalings=scalings,
+            title=title,
+            block=False,
+        )
         plt.show(block=True)
 
     # ── output ────────────────────────────────────────────────────────────────
@@ -257,12 +316,15 @@ class PipelineRunner:
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
+
 def cli() -> None:
-    parser = argparse.ArgumentParser(prog="mdr-pipe",
-                                     description="Declarative EEG pipeline runner")
+    parser = argparse.ArgumentParser(
+        prog="mdr-pipe", description="Declarative EEG pipeline runner"
+    )
     sub = parser.add_subparsers(dest="cmd")
     sub.add_parser("run", help="Execute a pipeline YAML").add_argument(
-        "pipeline", help="Path to pipeline YAML")
+        "pipeline", help="Path to pipeline YAML"
+    )
 
     args = parser.parse_args()
     if args.cmd == "run":

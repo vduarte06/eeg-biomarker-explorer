@@ -11,12 +11,11 @@ from mne.time_frequency import psd_array_multitaper
 
 from eeg_biomarker_explorer.utils.session_log import SessionLog, extract_segments
 
-
 BANDS: dict[str, tuple[float, float]] = {
     "delta": (0.5, 4.0),
     "theta": (4.0, 8.0),
     "alpha": (8.0, 13.0),
-    "beta":  (13.0, 30.0),
+    "beta": (13.0, 30.0),
     "gamma": (30.0, 45.0),
 }
 
@@ -48,13 +47,15 @@ def bandpower(
     -------
     bandpower : array of shape (n_channels,)
     """
-    assert data.ndim == 2, (
-        "The provided data must be a 2D array of shape (n_channels, n_samples)."
-    )
+    assert (
+        data.ndim == 2
+    ), "The provided data must be a 2D array of shape (n_channels, n_samples)."
     freqs, psd = _compute_psd(data, fs, method, **kwargs)
 
     assert len(band) == 2, "The 'band' argument must be a 2-length tuple."
-    assert band[0] <= band[1], "The 'band' argument must be defined as (low, high) in Hz."
+    assert (
+        band[0] <= band[1]
+    ), "The 'band' argument must be defined as (low, high) in Hz."
 
     freq_res = freqs[1] - freqs[0]
     idx_band = np.logical_and(freqs >= band[0], freqs <= band[1])
@@ -156,7 +157,7 @@ def run_peak_analysis(
         kind_counters[kind] = kind_counters.get(kind, -1) + 1
         seg_idx = kind_counters[kind]
 
-        data, _ = raw[:, raw.time_as_index(onset)[0]:raw.time_as_index(offset)[0]]
+        data, _ = raw[:, raw.time_as_index(onset)[0] : raw.time_as_index(offset)[0]]
 
         peaks: dict[str, tuple[NDArray, NDArray]] = {
             band_name: peak_bandpower(data, fs, method, band_range, **kwargs)
@@ -167,7 +168,7 @@ def run_peak_analysis(
             row = {"segment_kind": kind, "segment_idx": seg_idx, "channel": ch}
             for band_name, (peak_pwr, peak_frq) in peaks.items():
                 row[f"{band_name}_peak_power"] = peak_pwr[ci]
-                row[f"{band_name}_peak_freq"]  = peak_frq[ci]
+                row[f"{band_name}_peak_freq"] = peak_frq[ci]
             rows.append(row)
 
     return pd.DataFrame(rows)
@@ -220,10 +221,9 @@ def aggregate_peak_by_region(
     active_regions = {n: idx for n, idx in region_indices.items() if idx}
 
     if not active_regions:
-        cols = (
-            ["segment_kind", "segment_idx", "region"]
-            + [f"{b}_{s}" for b in bands for s in ("peak_power", "peak_freq")]
-        )
+        cols = ["segment_kind", "segment_idx", "region"] + [
+            f"{b}_{s}" for b in bands for s in ("peak_power", "peak_freq")
+        ]
         return pd.DataFrame(columns=cols)
 
     rows = []
@@ -237,7 +237,7 @@ def aggregate_peak_by_region(
         kind_counters[kind] = kind_counters.get(kind, -1) + 1
         seg_idx = kind_counters[kind]
 
-        data, _ = raw[:, raw.time_as_index(onset)[0]:raw.time_as_index(offset)[0]]
+        data, _ = raw[:, raw.time_as_index(onset)[0] : raw.time_as_index(offset)[0]]
 
         for region_name, indices in active_regions.items():
             region_sig = data[indices].mean(axis=0, keepdims=True)  # (1, n_samples)
@@ -245,7 +245,7 @@ def aggregate_peak_by_region(
             for band_name, band_range in bands.items():
                 pwr, frq = peak_bandpower(region_sig, fs, method, band_range, **kwargs)
                 row[f"{band_name}_peak_power"] = float(pwr[0])
-                row[f"{band_name}_peak_freq"]  = float(frq[0])
+                row[f"{band_name}_peak_freq"] = float(frq[0])
             rows.append(row)
 
     return pd.DataFrame(rows)
@@ -299,7 +299,7 @@ def run_band_analysis(
         seg_idx = kind_counters[kind]
 
         tmin, tmax = onset, offset
-        data, _ = raw[:, raw.time_as_index(tmin)[0]:raw.time_as_index(tmax)[0]]
+        data, _ = raw[:, raw.time_as_index(tmin)[0] : raw.time_as_index(tmax)[0]]
 
         bp_per_band = {
             band_name: bandpower(data, fs, method, band_range, relative, **kwargs)
@@ -384,7 +384,7 @@ def aggregate_by_region(
         kind_counters[kind] = kind_counters.get(kind, -1) + 1
         seg_idx = kind_counters[kind]
 
-        data, _ = raw[:, raw.time_as_index(onset)[0]:raw.time_as_index(offset)[0]]
+        data, _ = raw[:, raw.time_as_index(onset)[0] : raw.time_as_index(offset)[0]]
 
         for region_name, indices in active_regions.items():
             region_sig = data[indices].mean(axis=0, keepdims=True)  # (1, n_samples)
@@ -416,7 +416,9 @@ def plot_band_analysis(df: pd.DataFrame, group_col: str = "channel") -> plt.Figu
          aggregate_by_region (group_col='region').
     group_col : column to use as the Y-axis grouping.
     """
-    band_cols = [c for c in df.columns if c not in ("segment_kind", "segment_idx", group_col)]
+    band_cols = [
+        c for c in df.columns if c not in ("segment_kind", "segment_idx", group_col)
+    ]
     kinds = df["segment_kind"].unique()
 
     fig, axes = plt.subplots(1, len(kinds), figsize=(6 * len(kinds), 8), sharey=True)
