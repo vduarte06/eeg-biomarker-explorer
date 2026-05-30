@@ -1,0 +1,50 @@
+version: 1
+
+# -----------------------------------------------------------
+# Input
+# -----------------------------------------------------------
+input:
+
+  dataset:
+    path: data/raw/01.edf                       # "sample" | path to .edf / .fif / .bdf / .set / .vhdr
+
+  events:
+    path:     ./data/raw/events.json  # session log with timestamps → annotations
+    emdr_t:   EMDR_T
+    emdr_o:   EMDR_O
+    introception: INTROCEPTION
+
+  regions:
+    frontal:   [EEG Fp1, EEG Fp2, EEG F3, EEG F4, EEG Fz] # notice that the channel names are EEG prefixed in our EDF file
+    central:   [EEG C3, EEG Cz, EEG C4]
+    temporal:  [EEG F7, EEG F8, EEG T3, EEG T4, EEG F9, EEG F10, EEG P10, EEG P9]
+    parietal:  [EEG P3, EEG P4, EEG Pz]
+    occipital: [EEG O1, EEG O2]
+
+# -----------------------------------------------------------
+# Pipeline — steps run in order; insert plot anywhere
+# -----------------------------------------------------------
+pipeline:
+
+  preprocessing:
+    - filter:
+        l_freq: 1.0
+        h_freq: 35.0
+
+    - line_noise:
+        freq: 60.0         # 50 Hz (EU) | 60 Hz (BR/US)
+
+    - bad_channels:
+        z_threshold: 3.0
+
+    - rereference:
+        method: average
+
+    - plot:
+        title: After preprocessing
+        sensitivity: 50              # µV/div
+
+
+output:
+  format: [csv]
+  path: ./data/processed
