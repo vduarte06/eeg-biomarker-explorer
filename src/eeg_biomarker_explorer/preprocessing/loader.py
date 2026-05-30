@@ -15,7 +15,7 @@ def load_sample() -> mne.io.Raw:
     folder = mne.datasets.sample.data_path()
     path = folder / "MEG" / "sample" / "sample_audvis_raw.fif"
     raw = mne.io.read_raw_fif(path, preload=True, verbose=False)
-    raw.pick("eeg")
+    raw.pick(["eeg", "eog"])
     _rename_to_1020(raw)
     return raw
 
@@ -61,5 +61,5 @@ def load_raw(path: str | Path) -> mne.io.Raw:
             f"Unsupported format '{path.suffix}'. Supported: {list(readers)}"
         )
     raw = reader(path, preload=True)
-    raw.pick("eeg")
+    raw.pick(["eeg", "eog"])
     return raw

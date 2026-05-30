@@ -67,34 +67,74 @@ def run_ica(
     n_components: int = 15,
     method: str = "fastica",
     eog_channels: list[str] | None = None,
-    max_iter: int = 1000,
+    eog_threshold: float | str = 3.0,
 ) -> mne.io.Raw:
     """Fit ICA, auto-detect EOG components, and apply to raw.
 
-    ICA is fitted on a 1 Hz high-pass copy (recommended practice) but applied
-    to the original raw. Components correlated with EOG channels are excluded.
+    Follows the MNE recommended workflow:
+    - Fit on a 1 Hz HP-filtered copy (removes slow drifts that hurt ICA)
+    - Apply to the original raw (preserves low-frequency content)
+    - Test each EOG surrogate channel independently and union the results,
+      so a blink component caught by Fp1 OR Fp2 is excluded.
+
+    Parameters
+    ----------
+    eog_channels : list of channel names used as eye-movement surrogates.
+        Fp1/Fp2 are typical proxies when no dedicated EOG channel exists.
+    eog_threshold : z-score threshold for find_bads_eog. Default 3.0.
+        Lower (e.g. 2.5) is more aggressive. Use 'auto' for adaptive tuning.
     """
-    # Fit on HP-filtered copy to improve convergence
     raw_hp = raw.copy().filter(l_freq=1.0, h_freq=None, verbose=False)
 
     ica = ICA(
         n_components=n_components,
         method=method,
-        max_iter=max_iter,
+        max_iter="auto",
         random_state=42,
         verbose=False,
     )
     ica.fit(raw_hp, verbose=False)
+    print(f"  [ICA] fitted {ica.n_components_} components")
 
-    # Auto-detect EOG artifacts
-    eog_chs = [ch for ch in (eog_channels or []) if ch in raw.ch_names]
-    if eog_chs:
-        eog_idx, _ = ica.find_bads_eog(raw, ch_name=eog_chs, verbose=False)
-        ica.exclude = eog_idx
-        print(f"  [ICA] excluding {len(eog_idx)} EOG component(s): {eog_idx}")
+    # If eog_channels is explicitly set in the YAML, use those.
+    # Otherwise auto-detect dedicated EOG channels from the recording.
+    if eog_channels:
+        eog_chs = [ch for ch in eog_channels if ch in raw.ch_names]
+        missing = [ch for ch in eog_channels if ch not in raw.ch_names]
+        if missing:
+            print(f"  [ICA] EOG channel(s) not in recording, skipping: {missing}")
     else:
-        print("  [ICA] no EOG channels found — skipping auto-detection")
+        eog_chs = [
+            ch
+            for ch in raw.ch_names
+            if mne.channel_type(raw.info, raw.ch_names.index(ch)) == "eog"
+        ]
+        if eog_chs:
+            print(f"  [ICA] auto-detected EOG channel(s): {eog_chs}")
 
+    # Test each channel independently and union results.
+    exclude: set[int] = set()
+    for ch in eog_chs:
+        idx, scores = ica.find_bads_eog(
+            raw, ch_name=ch, threshold=eog_threshold, verbose=False
+        )
+        if idx:
+            print(
+                f"  [ICA] {ch} → component(s) {idx}  (max |r|={max(abs(scores)):.2f})"
+            )
+        exclude.update(idx)
+
+    if not eog_chs:
+        print("  [ICA] no EOG channels found — skipping eye movement removal")
+    elif not exclude:
+        print(
+            f"  [ICA] no components exceeded threshold={eog_threshold}. "
+            "Consider lowering eog_threshold (e.g. 2.5)."
+        )
+    else:
+        print(f"  [ICA] excluding {len(exclude)} EOG component(s): {sorted(exclude)}")
+
+    ica.exclude = sorted(exclude)
     ica.apply(raw, verbose=False)
     return raw
 

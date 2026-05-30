@@ -4,9 +4,9 @@ input:
 
   dataset:
     path: sample                     # "sample" | path to .edf / .fif / .bdf / .set / .vhdr
-    session_log: ./data/raw/events.json
 
   events:
+    path:     ./data/raw/events.json  # session log with timestamps → annotations
     emdr:     EMDR_T
     baseline: INTROCEPTION
 
@@ -42,11 +42,12 @@ pipeline:
     - ica:
         n_components: 20
         method: fastica
-        eog_channels: [Fp1, Fp2]
+        # eog_channels: [Fp1, Fp2]  # set to override auto-detection; omit to use dedicated EOG channels
+        eog_threshold: 3.0          # lower (e.g. 2.5) to catch more components
 
-    - interpolate:
+    # - interpolate:
 
-    - bad_segments:
+    - bad_segment_annotation:
         peak_amplitude: 150.0e-6
 
     - plot:

@@ -11,12 +11,13 @@ from pydantic import BaseModel, field_validator, model_validator
 
 class DatasetConfig(BaseModel):
     path: str
-    session_log: str | None = None
 
 
 class InputConfig(BaseModel):
     dataset: DatasetConfig
-    events: dict[str, str] = {}  # friendly_name → annotation_label
+    # events may contain a reserved 'path' key (session log file) alongside
+    # the friendly_name → annotation_label mappings.
+    events: dict[str, str] = {}
     regions: dict[str, list[str]] = {}
 
 
@@ -68,6 +69,8 @@ class OutputConfig(BaseModel):
 
 
 class PipelineSchema(BaseModel):
+    model_config = {"extra": "forbid"}
+
     version: int = 1
     input: InputConfig
     pipeline: PipelineConfig = PipelineConfig()
