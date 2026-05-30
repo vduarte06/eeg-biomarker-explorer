@@ -9,6 +9,7 @@ Usage
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -104,6 +105,9 @@ class PipelineRunner:
         log_path = raw_events.get("path")
         event_map = {k: v for k, v in raw_events.items() if k != "path"}
 
+        if log_path and inp["dataset"].get("path") == "sample" and event_map:
+            self._ensure_sample_events(log_path, event_map)
+
         self._apply_session_log(raw, log_path)
         regions = {
             name: (cfg["channels"] if isinstance(cfg, dict) else cfg)
@@ -129,6 +133,31 @@ class PipelineRunner:
         full = self.root / path
         print(f"  dataset  : {full}")
         return load_raw(full)
+
+    def _ensure_sample_events(self, log_path: str, event_map: dict) -> None:
+        path = self.root / log_path
+        if path.exists():
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        labels = list(dict.fromkeys(event_map.values()))
+        events: list[list[str]] = [["00:00:00.000", "START_SESSION"]]
+        t = 10
+        for i, label in enumerate(labels):
+            if i > 0:
+                t += 20
+            for rep in range(2):
+                if rep > 0:
+                    t += 15
+                h, m, s = t // 3600, (t % 3600) // 60, t % 60
+                events.append([f"{h:02d}:{m:02d}:{s:02d}.000", f"START_{label}"])
+                t += 30
+                h, m, s = t // 3600, (t % 3600) // 60, t % 60
+                events.append([f"{h:02d}:{m:02d}:{s:02d}.000", f"END_{label}"])
+        t += 10
+        h, m, s = t // 3600, (t % 3600) // 60, t % 60
+        events.append([f"{h:02d}:{m:02d}:{s:02d}.000", "FIM_SESSAO"])
+        path.write_text(json.dumps(events, indent=2))
+        print(f"  events   : generated sample events → {path}")
 
     def _apply_session_log(self, raw: mne.io.Raw, log_path: str | None) -> None:
         if not log_path:
@@ -331,10 +360,10 @@ version: 1
 input:
 
   dataset:
-    path: ./data/raw/recording.edf     # "sample" | path to .edf / .fif / .bdf / .set / .vhdr
+    path: sample                       # "sample" | path to .edf / .fif / .bdf / .set / .vhdr
 
   events:
-    path:        ./data/raw/events.json  # session log with timestamps → annotations
+    path:        ./data/raw/events.json  # auto-generated when path=sample and file is absent
     condition_a: LABEL_A
     condition_b: LABEL_B
 

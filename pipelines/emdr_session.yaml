@@ -82,5 +82,5 @@ pipeline:
           right: F4
 
 output:
-  format: [csv, parquet]
+  format: [csv]
   path: ./data/processed
