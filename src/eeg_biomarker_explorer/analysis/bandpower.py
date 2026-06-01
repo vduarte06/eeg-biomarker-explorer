@@ -65,6 +65,22 @@ def bandpower(
     return bp
 
 
+def _bandpower_both(
+    data: NDArray[np.float64],
+    fs: float,
+    method: str,
+    band: tuple[float, float],
+    **kwargs,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Return (absolute_bp, relative_bp) per channel with a single PSD computation."""
+    freqs, psd = _compute_psd(data, fs, method, **kwargs)
+    freq_res = freqs[1] - freqs[0]
+    idx_band = np.logical_and(freqs >= band[0], freqs <= band[1])
+    abs_bp = simpson(psd[:, idx_band], dx=freq_res)
+    rel_bp = abs_bp / simpson(psd, dx=freq_res)
+    return abs_bp, rel_bp
+
+
 def _compute_psd(
     data: NDArray[np.float64],
     fs: float,
@@ -301,16 +317,27 @@ def run_band_analysis(
         tmin, tmax = onset, offset
         data, _ = raw[:, raw.time_as_index(tmin)[0] : raw.time_as_index(tmax)[0]]
 
-        bp_per_band = {
-            band_name: bandpower(data, fs, method, band_range, relative, **kwargs)
-            for band_name, band_range in bands.items()
-        }
-
-        for ci, ch in enumerate(ch_names):
-            row = {"segment_kind": kind, "segment_idx": seg_idx, "channel": ch}
-            for band_name, bp_arr in bp_per_band.items():
-                row[band_name] = bp_arr[ci]
-            rows.append(row)
+        if relative == "both":
+            bp_per_band = {
+                band_name: _bandpower_both(data, fs, method, band_range, **kwargs)
+                for band_name, band_range in bands.items()
+            }
+            for ci, ch in enumerate(ch_names):
+                row = {"segment_kind": kind, "segment_idx": seg_idx, "channel": ch}
+                for band_name, (abs_bp, rel_bp) in bp_per_band.items():
+                    row[f"{band_name}_abs"] = abs_bp[ci]
+                    row[f"{band_name}_rel"] = rel_bp[ci]
+                rows.append(row)
+        else:
+            bp_per_band = {
+                band_name: bandpower(data, fs, method, band_range, relative, **kwargs)
+                for band_name, band_range in bands.items()
+            }
+            for ci, ch in enumerate(ch_names):
+                row = {"segment_kind": kind, "segment_idx": seg_idx, "channel": ch}
+                for band_name, bp_arr in bp_per_band.items():
+                    row[band_name] = bp_arr[ci]
+                rows.append(row)
 
     return pd.DataFrame(rows)
 
@@ -389,10 +416,20 @@ def aggregate_by_region(
         for region_name, indices in active_regions.items():
             region_sig = data[indices].mean(axis=0, keepdims=True)  # (1, n_samples)
             row = {"segment_kind": kind, "segment_idx": seg_idx, "region": region_name}
-            for band_name, band_range in bands.items():
-                row[band_name] = float(
-                    bandpower(region_sig, fs, method, band_range, relative, **kwargs)[0]
-                )
+            if relative == "both":
+                for band_name, band_range in bands.items():
+                    abs_bp, rel_bp = _bandpower_both(
+                        region_sig, fs, method, band_range, **kwargs
+                    )
+                    row[f"{band_name}_abs"] = float(abs_bp[0])
+                    row[f"{band_name}_rel"] = float(rel_bp[0])
+            else:
+                for band_name, band_range in bands.items():
+                    row[band_name] = float(
+                        bandpower(
+                            region_sig, fs, method, band_range, relative, **kwargs
+                        )[0]
+                    )
             rows.append(row)
 
     return pd.DataFrame(rows)
@@ -475,13 +512,15 @@ def plot_band_analysis(df: pd.DataFrame, group_col: str = "channel") -> plt.Figu
         subset = df[df["segment_kind"] == kind]
         pivot = subset.groupby(group_col)[band_cols].mean()
 
-        im = ax.imshow(pivot.values, aspect="auto", cmap="RdYlBu_r", vmin=0, vmax=1)
+        vmax = 1.0 if pivot.values.max() <= 1.0 else None
+        label = "Relative power" if vmax == 1.0 else "Power"
+        im = ax.imshow(pivot.values, aspect="auto", cmap="RdYlBu_r", vmin=0, vmax=vmax)
         ax.set_title(kind, fontsize=12, fontweight="bold")
         ax.set_xticks(range(len(band_cols)))
         ax.set_xticklabels(band_cols, rotation=30, ha="right")
         ax.set_yticks(range(len(pivot)))
         ax.set_yticklabels(pivot.index, fontsize=7)
-        plt.colorbar(im, ax=ax, label="Relative power")
+        plt.colorbar(im, ax=ax, label=label)
 
     fig.suptitle(f"Relative bandpower per {group_col} — EMDR session", fontsize=13)
     fig.tight_layout()

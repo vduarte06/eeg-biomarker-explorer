@@ -94,7 +94,7 @@ _DEFAULTS = {
         "method": "welch",
         "bands": {},
         "groupby": "region",
-        "relative": True,
+        "relative": True,  # True | False | "both"
     },
     "peak_power": {"events": [], "method": "welch", "bands": {}, "groupby": "region"},
     "faa": {"events": [], "method": "welch", "channels": {"left": "F3", "right": "F4"}},

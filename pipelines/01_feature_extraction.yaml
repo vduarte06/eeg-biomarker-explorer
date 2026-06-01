@@ -50,7 +50,7 @@ pipeline:
           alpha: [8, 12]
           beta:  [12, 30]
         groupby: region              # channel | region
-        relative: true
+        relative: both
 
     - peak_power:
         events: [baseline]
