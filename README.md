@@ -132,9 +132,9 @@ Cut an EDF to a wall-clock time window (UTC) and save a new file:
 
 ```bash
 eeg-pipe crop data/raw/01.edf \
-    --start 09:50 \
-    --end   12:00 \
-    --output data/raw/01__baseline.edf
+    --start 13:00 \
+    --end   20:00 \
+    --output data/raw/01_post_session_2.edf
 ```
 
 Times must match the UTC clock time embedded in the EDF header (`meas_date`).
@@ -171,7 +171,9 @@ pipeline:
     - filter:      { l_freq: 1.0, h_freq: 35.0 }
     - line_noise:  { freq: 60.0 }
     - bad_channels:
-    - rereference: { method: average }
+    - rereference:
+        method: average
+        # exclude: [ECG]   # list channels to omit from the average (e.g. ECG mislabeled as EEG)
     - ica:         { n_components: 15 }
     - interpolate:
     - bad_segment_annotation:
@@ -205,7 +207,7 @@ output:
 | `filter` | Bandpass filter | `l_freq`, `h_freq` |
 | `line_noise` | Notch filter | `freq` — 50 Hz (EU) or 60 Hz (BR/US) |
 | `bad_channels` | Flags noisy/flat channels | `z_threshold` |
-| `rereference` | Re-referencing | `method: average \| REST \| channel` |
+| `rereference` | Re-referencing | `method: average \| REST \| channel`, `exclude` — channel names to omit from the average (e.g. ECG channels mislabeled as EEG in the file header) |
 | `ica` | ICA eye-movement removal | `n_components`, `method`, `eog_channels`, `eog_threshold` |
 | `interpolate` | Spherical spline interpolation of flagged channels | — |
 | `bad_segment_annotation` | Marks amplitude-spike segments as BAD | `peak_amplitude` (µV) |

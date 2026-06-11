@@ -11,7 +11,7 @@ version: 1
 input:
 
   dataset:
-    path: ./data/raw/01_baseline.edf
+    path: ./data/raw/01_post_session_2.edf
     exclude: [DC1+, DC2+, trx1+, trx2+, Flw1+, Flw2+]
 
   events:
@@ -45,6 +45,8 @@ pipeline:
 
     - rereference:
         method: average
+        exclude: [ECG1+]   # uncomment and set the channel name if your EDF has an ECG
+        #                   # channel typed as 'eeg' — keeps it out of the average reference
 
     - ica:
         n_components: 20
@@ -62,7 +64,7 @@ pipeline:
         time_format: clock
 
     - annotate:
-        output: ./data/raw/user_epochs.json
+        output: ./data/raw/user_epochs_post_session.json
         sensitivity: 50
 
 output:

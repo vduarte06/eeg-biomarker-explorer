@@ -68,7 +68,7 @@ _DEFAULTS = {
     "filter": {"l_freq": 1.0, "h_freq": 35.0},
     "line_noise": {"freq": 60.0},
     "bad_channels": {"z_threshold": 3.0},
-    "rereference": {"method": "average"},
+    "rereference": {"method": "average", "exclude": None},
     "ica": {
         "n_components": 15,
         "method": "fastica",
@@ -271,7 +271,7 @@ class PipelineRunner:
 
         elif kind == "rereference":
             print(f"{label}  ({cfg['method']})")
-            return rereference(raw, ref=cfg["method"])
+            return rereference(raw, ref=cfg["method"], exclude=cfg.get("exclude"))
 
         elif kind == "ica":
             print(
@@ -585,16 +585,17 @@ def crop_edf(input_path: str, start: str, end: str, output: str) -> None:
     meas_date = raw.info["meas_date"]  # timezone-aware UTC datetime
 
     t_start = _parse_clock(start, meas_date)
-    t_end = _parse_clock(end, meas_date)
+    # Resolve end relative to start so it always falls after start (handles midnight wrap).
+    t_end = _parse_clock(end, t_start)
 
     tmin = (t_start - meas_date).total_seconds()
     tmax = (t_end - meas_date).total_seconds()
 
     rec_dur = raw.times[-1]
-    if tmin < 0 or tmax > rec_dur:
+    if tmin < 0 or tmin >= tmax or tmax > rec_dur:
         print(
             f"Error: window [{start}–{end}] maps to [{tmin:.0f}s–{tmax:.0f}s] but "
-            f"recording is {rec_dur:.0f}s long (starts {meas_date.strftime('%H:%M')} UTC)."
+            f"recording is {rec_dur:.0f}s long (starts {meas_date.strftime('%H:%M:%S')} UTC)."
         )
         sys.exit(1)
 

@@ -55,15 +55,31 @@ def detect_bad_channels(raw: mne.io.Raw, z_threshold: float = 3.0) -> mne.io.Raw
 # ── Step 3 ────────────────────────────────────────────────────────────────────
 
 
-def rereference(raw: mne.io.Raw, ref: str = "average") -> mne.io.Raw:
-    """Apply EEG re-referencing (average, REST, or a named channel)."""
+def rereference(
+    raw: mne.io.Raw,
+    ref: str = "average",
+    exclude: list[str] | None = None,
+) -> mne.io.Raw:
+    """Apply EEG re-referencing (average, REST, or a named channel).
+
+    exclude: channel names to omit from the average even if typed as 'eeg'
+             (useful for ECG/EOG channels that are mislabeled in the EDF header).
+    """
     if ref == "average":
+        extra_excl = set(exclude or [])
         good_picks = mne.pick_types(raw.info, eeg=True, exclude="bads")
-        good_chs = [raw.ch_names[i] for i in good_picks]
+        good_chs = [
+            raw.ch_names[i] for i in good_picks if raw.ch_names[i] not in extra_excl
+        ]
         print(f"  [rereference] {len(good_chs)} channels in average: {good_chs}")
         if raw.info["bads"]:
             print(f"  [rereference] excluded (bads): {raw.info['bads']}")
-    raw.set_eeg_reference(ref, projection=False, verbose=False)
+        if extra_excl:
+            actually_excluded = extra_excl & set(raw.ch_names)
+            print(f"  [rereference] excluded (explicit): {sorted(actually_excluded)}")
+        raw.set_eeg_reference(ref_channels=good_chs, projection=False, verbose=False)
+    else:
+        raw.set_eeg_reference(ref, projection=False, verbose=False)
     return raw
 
 

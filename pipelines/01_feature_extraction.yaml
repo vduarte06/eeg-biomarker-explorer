@@ -9,7 +9,7 @@ version: 1
 input:
 
   dataset:
-    path: ./data/raw/01_baseline_after_ica.edf
+    path: ./data/raw/01_post_session_after_ica.edf
 
   events:
     path:         ./data/raw/events.json
